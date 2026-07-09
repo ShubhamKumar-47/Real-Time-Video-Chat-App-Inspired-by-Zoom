@@ -25,6 +25,8 @@ const PORT = process.env.PORT || 8000;
 
 const allowedOrigins = [
     process.env.FRONTEND_URL,
+    "https://www.easymeet.space",
+    "https://easymeet.space",
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:5175",
