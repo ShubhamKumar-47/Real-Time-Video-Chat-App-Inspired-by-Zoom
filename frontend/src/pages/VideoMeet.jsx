@@ -424,6 +424,8 @@ export default function VideoMeetComponent() {
                             const remoteStream = event.streams[0];
                             if (!remoteStream) return;
 
+                            console.log("Remote stream:", remoteStream);
+
                             let videoExists = videoRef.current.find(video => video.socketId === socketListId);
 
                             if (videoExists) {
@@ -448,6 +450,18 @@ export default function VideoMeetComponent() {
                                     return updatedVideos;
                                 });
                             }
+
+                            setTimeout(() => {
+                                const videoElement = document.querySelector(`[data-socket="${socketListId}"]`);
+                                if (videoElement) {
+                                    if (videoElement.srcObject !== remoteStream) {
+                                        videoElement.srcObject = remoteStream;
+                                        console.log("Video element:", videoElement);
+                                        console.log("Assigned srcObject:", videoElement.srcObject);
+                                        videoElement.play().catch(console.error);
+                                    }
+                                }
+                            }, 100);
                         };
 
                         // Add the local video tracks
@@ -624,10 +638,22 @@ export default function VideoMeetComponent() {
                                         data-socket={video.socketId}
                                         ref={ref => {
                                             if (ref && video.stream) {
-                                                ref.srcObject = video.stream;
+                                                if (ref.srcObject !== video.stream) {
+                                                    ref.srcObject = video.stream;
+                                                    console.log("Remote stream:", video.stream);
+                                                    console.log("Video element:", ref);
+                                                    console.log("Assigned srcObject:", ref.srcObject);
+                                                    ref.play().catch(console.error);
+                                                }
                                             }
                                         }}
                                         autoPlay
+                                        playsInline
+                                        muted={false}
+                                        onLoadedMetadata={(e) => {
+                                            const videoElement = e.target;
+                                            console.log("Loaded metadata event. videoWidth:", videoElement.videoWidth, "videoHeight:", videoElement.videoHeight);
+                                        }}
                                     ></video>
                                     <div className={styles.participantName}>
                                         Participant ({video.socketId.substring(0, 5)})
