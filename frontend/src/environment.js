@@ -1,8 +1,6 @@
-let IS_PROD = true;
+const IS_PROD = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
 const server = IS_PROD ?
     "https://apnacollegebackend.onrender.com" :
-
-    "http://localhost:8000"
-
+    "http://localhost:8001";
 
 export default server;

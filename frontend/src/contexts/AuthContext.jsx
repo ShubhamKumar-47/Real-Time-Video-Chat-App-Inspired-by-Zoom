@@ -1,5 +1,5 @@
 import axios from "axios";
-import { createContext, useContext, useState } from "react";
+import { createContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import server from "../environment";
 
@@ -11,11 +11,36 @@ const client = axios.create({
 
 export const AuthProvider = ({ children }) => {
 
-    const authContext = useContext(AuthContext);
+    // Start with no user data by default; provider should not consume its own context.
+    const [userData, setUserData] = useState(null);
 
-    const [userData, setUserData] = useState(authContext);
+    const navigate = useNavigate();
 
-    const router = useNavigate();
+    const fetchUserInfo = async () => {
+        try {
+            const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+            if (!token) return null;
+            let request = await client.get("/get_user_info", {
+                params: {
+                    token
+                }
+            });
+            if (request.status === 200) {
+                setUserData(request.data);
+                return request.data;
+            }
+        } catch (err) {
+            console.error("Failed to fetch user info:", err);
+            localStorage.removeItem("token");
+            sessionStorage.removeItem("token");
+            setUserData(null);
+        }
+        return null;
+    };
+
+    useEffect(() => {
+        fetchUserInfo();
+    }, []);
 
     const handleRegister = async (name, username, password) => {
         try {
@@ -34,20 +59,30 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const handleLogin = async (username, password) => {
+    const handleLogin = async (username, password, remember = false) => {
         try {
             let request = await client.post("/login", {
                 username,
                 password
             });
 
-            console.log(username, password);
-            console.log(request.data);
-
             if (request.status === 200) {  // OK
-                localStorage.setItem("token", request.data.token);
-                router("/home");
+                const token = request.data.token;
+                // If user wants to be remembered, persist to localStorage, otherwise sessionStorage
+                if (remember) {
+                    localStorage.setItem("token", token);
+                } else {
+                    sessionStorage.setItem("token", token);
+                }
+                
+                // Fetch and populate user profile data immediately
+                await fetchUserInfo();
+                
+                // Return token so caller can decide navigation/UI
+                return token;
             }
+
+            return null;
 
         } catch (err) {
             throw err;
@@ -56,9 +91,10 @@ export const AuthProvider = ({ children }) => {
 
     const getHistoryOfUser = async () => {
         try {
+            const token = localStorage.getItem("token") || sessionStorage.getItem("token");
             let request = await client.get("/get_all_activity", {
                 params: {
-                    token: localStorage.getItem("token")
+                    token
                 }
             });
 
@@ -71,8 +107,9 @@ export const AuthProvider = ({ children }) => {
 
     const addToUserHistory = async (meetingCode) => {
         try {
+            const token = localStorage.getItem("token") || sessionStorage.getItem("token");
             let request = await client.post("/add_to_activity", {
-                token: localStorage.getItem("token"),
+                token,
                 meeting_code: meetingCode
             });
 
@@ -83,13 +120,22 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const handleLogout = () => {
+        localStorage.removeItem("token");
+        sessionStorage.removeItem("token");
+        setUserData(null);
+        navigate("/auth");
+    };
+
     const data = {
         userData,
         setUserData,
         addToUserHistory,
         getHistoryOfUser,
         handleRegister,
-        handleLogin
+        handleLogin,
+        fetchUserInfo,
+        handleLogout
     };
 
     return (

@@ -1,175 +1,360 @@
-import * as React from 'react';
-import Avatar from '@mui/material/Avatar';
-import Button from '@mui/material/Button';
-import CssBaseline from '@mui/material/CssBaseline';
-import TextField from '@mui/material/TextField';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
-import Link from '@mui/material/Link';
-import Paper from '@mui/material/Paper';
-import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import Typography from '@mui/material/Typography';
-import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { AuthContext } from '../contexts/AuthContext';
-import { Snackbar } from '@mui/material';
+import React, { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
+import {
+  Box,
+  Button,
+  Checkbox,
+  FormControlLabel,
+  Grid,
+  Link,
+  Stack,
+  Typography,
+  useMediaQuery,
+  useTheme,
+  CssBaseline,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Zoom,
+  CircularProgress,
+  Avatar
+} from '@mui/material'
+import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined'
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
+import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
+import GoogleIcon from '@mui/icons-material/Google'
+import GitHubIcon from '@mui/icons-material/GitHub'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import AuthTextField from '../components/AuthTextField'
+import PasswordInput from '../components/PasswordInput'
+import { AuthContext } from '../contexts/AuthContext'
 
+const formVariants = {
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: 'easeOut' } }
+}
 
-
-// TODO remove, this demo shouldn't need to reset the theme.
-
-const defaultTheme = createTheme();
+const features = [
+  'HD Meetings',
+  'AI Notes',
+  'Screen Sharing',
+  'End-to-End Encryption'
+]
 
 export default function Authentication() {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [name, setName] = useState('')
+  const [error, setError] = useState('')
+  const [formState, setFormState] = useState(0)
+  const [successOpen, setSuccessOpen] = useState(false)
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
+  const [emailValid, setEmailValid] = useState(true)
+  const [passwordStrength, setPasswordStrength] = useState({ score: 0, label: '', color: '' })
 
-    
+  const { handleRegister, handleLogin } = React.useContext(AuthContext)
+  const navigate = useNavigate()
+  const theme = useTheme()
+  const isMd = useMediaQuery(theme.breakpoints.up('md'))
 
-    const [username, setUsername] = React.useState();
-    const [password, setPassword] = React.useState();
-    const [name, setName] = React.useState();
-    const [error, setError] = React.useState();
-    const [message, setMessage] = React.useState();
+  useEffect(() => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const usernameRegex = /^[a-zA-Z0-9_]{3,30}$/
+    setEmailValid(emailRegex.test(username) || usernameRegex.test(username) || username === '')
+  }, [username])
 
-
-    const [formState, setFormState] = React.useState(0);
-
-    const [open, setOpen] = React.useState(false)
-
-
-    const { handleRegister, handleLogin } = React.useContext(AuthContext);
-
-    let handleAuth = async () => {
-        try {
-            if (formState === 0) {
-
-                let result = await handleLogin(username, password)
-
-
-            }
-            if (formState === 1) {
-                let result = await handleRegister(name, username, password);
-                console.log(result);
-                setUsername("");
-                setMessage(result);
-                setOpen(true);
-                setError("")
-                setFormState(0)
-                setPassword("")
-            }
-        } catch (err) {
-
-            console.log(err);
-            let message = (err.response.data.message);
-            setError(message);
-        }
+  useEffect(() => {
+    const score = [password.length >= 8, /[A-Z]/.test(password), /[0-9]/.test(password), /[^A-Za-z0-9]/.test(password)].filter(Boolean).length
+    if (!password) {
+      setPasswordStrength({ score: 0, label: '', color: '' })
+    } else if (score <= 1) {
+      setPasswordStrength({ score, label: 'Weak', color: 'error.main' })
+    } else if (score === 2) {
+      setPasswordStrength({ score, label: 'Medium', color: 'warning.main' })
+    } else {
+      setPasswordStrength({ score, label: 'Strong', color: 'success.main' })
     }
+  }, [password])
 
+  const handleAuth = async () => {
+    try {
+      setLoading(true)
+      if (formState === 0) {
+        const token = await handleLogin(username, password, rememberMe)
+        if (token) {
+          setTimeout(() => navigate('/home'), 500)
+        }
+        setLoading(false)
+        return
+      }
 
-    return (
-        <ThemeProvider theme={defaultTheme}>
-            <Grid container component="main" sx={{ height: '100vh' }}>
-                <CssBaseline />
-                <Grid
-                    item
-                    xs={false}
-                    sm={4}
-                    md={7}
-                    sx={{
-                        backgroundImage: 'url(https://source.unsplash.com/random?wallpapers)',
-                        backgroundRepeat: 'no-repeat',
-                        backgroundColor: (t) =>
-                            t.palette.mode === 'light' ? t.palette.grey[50] : t.palette.grey[900],
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
+      if (password !== confirmPassword) {
+        setError('Passwords do not match.')
+        setLoading(false)
+        return
+      }
+
+      await handleRegister(name, username, password)
+      setSuccessOpen(true)
+      setError('')
+      setFormState(0)
+      setPassword('')
+      setConfirmPassword('')
+      setName('')
+      setLoading(false)
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'Something went wrong'
+      setError(message)
+      setLoading(false)
+    }
+  }
+
+  const toggleForm = (state) => {
+    setFormState(state)
+    setError('')
+  }
+
+  const activeCard = formState === 0
+
+  return (
+    <Box sx={{ minHeight: '100vh', background: '#F8FAFC' }}>
+      <CssBaseline />
+      <Grid container sx={{ minHeight: '100vh' }}>
+        <Grid size={{ xs: 12, md: 6 }} sx={{ display: { xs: 'none', md: 'block' }, position: 'relative', background: 'linear-gradient(180deg, #312E81 0%, #1E293B 100%)', color: '#fff', overflow: 'hidden' }}>
+          <Box sx={{ position: 'absolute', width: 320, height: 320, top: -80, right: -80, bgcolor: 'rgba(167,139,250,0.28)', borderRadius: '50%', filter: 'blur(100px)' }} />
+          <Box sx={{ position: 'absolute', width: 260, height: 260, top: 160, left: -40, bgcolor: 'rgba(59,130,246,0.18)', borderRadius: '50%', filter: 'blur(90px)' }} />
+          <Box sx={{ position: 'absolute', width: 280, height: 240, bottom: 60, right: 40, bgcolor: 'rgba(99,102,241,0.18)', borderRadius: 32, filter: 'blur(80px)' }} />
+          
+          {/* Glass dashboard status indicator */}
+          <Box 
+            sx={{ 
+              position: 'absolute', 
+              background: 'rgba(255,255,255,0.06)', 
+              border: '1px solid rgba(255,255,255,0.12)',
+              width: 190, 
+              height: 74, 
+              borderRadius: '16px', 
+              top: 240, 
+              right: 60, 
+              backdropFilter: 'blur(20px)',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              px: 2.5,
+              gap: 1.5
+            }}
+          >
+            <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#10B981', boxShadow: '0 0 12px #10B981' }} />
+            <Box>
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', letterSpacing: 1, textTransform: 'uppercase' }}>System Status</Typography>
+              <Typography sx={{ fontSize: 13, fontWeight: 800, color: '#fff', mt: 0.2 }}>All Services Live</Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{ position: 'absolute', width: 100, height: 100, top: 80, left: 60, bgcolor: 'rgba(167,139,250,0.12)', borderRadius: '50%', filter: 'blur(80px)' }} />
+          <Box sx={{ position: 'absolute', width: 160, height: 120, bottom: 180, left: 60, bgcolor: 'rgba(99,102,241,0.14)', borderRadius: 4, filter: 'blur(70px)' }} />
+          <Box sx={{ position: 'absolute', width: 180, height: 220, top: 140, right: 120, bgcolor: 'rgba(59,130,246,0.08)', borderRadius: 32, filter: 'blur(90px)' }} />
+          <Box sx={{ position: 'absolute', width: 220, height: 140, bottom: 60, right: 120, bgcolor: 'rgba(167,139,250,0.12)', borderRadius: 32, filter: 'blur(80px)' }} />
+ 
+          <Box sx={{ position: 'relative', height: '100%', px: 10, py: 12, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <Box>
+              <Typography sx={{ textTransform: 'uppercase', letterSpacing: 2, color: 'rgba(255,255,255,0.7)', fontWeight: 700, mb: 3 }}>EasyMeet.space</Typography>
+              <Typography sx={{ fontSize: '3.2rem', fontWeight: 900, lineHeight: 1.02, mb: 3 }}>Welcome to EasyMeet.space</Typography>
+              <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 18, maxWidth: 420, lineHeight: 1.8 }}>Secure meetings for modern teams.</Typography>
+            </Box>
+ 
+            <Stack spacing={2} sx={{ mt: 6 }}>
+              {features.map((item) => (
+                <Box key={item} sx={{ display: 'flex', alignItems: 'center', gap: 2, color: '#fff', opacity: 0.92 }}>
+                  <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: '#6D4AFF', display: 'grid', placeItems: 'center' }}>✓</Box>
+                  <Typography sx={{ fontWeight: 600 }}>{item}</Typography>
+                </Box>
+              ))}
+            </Stack>
+ 
+            <Box sx={{ mt: 6, display: 'flex', alignItems: 'center', gap: 3, color: 'rgba(255,255,255,0.85)' }}>
+              <Stack direction="row" spacing={-1.2}>
+                {[
+                  { initial: 'JD', bg: '#6D4AFF' },
+                  { initial: 'AK', bg: '#06B6D4' },
+                  { initial: 'ST', bg: '#10B981' },
+                  { initial: 'ML', bg: '#F59E0B' }
+                ].map((av, index) => (
+                  <Avatar 
+                    key={index} 
+                    sx={{ 
+                      width: 40, 
+                      height: 40, 
+                      fontSize: 13, 
+                      fontWeight: 800, 
+                      bgcolor: av.bg, 
+                      color: '#fff', 
+                      border: '2px solid #1E293B',
+                      boxShadow: '0 4px 10px rgba(0,0,0,0.15)'
                     }}
-                />
-                <Grid item xs={12} sm={8} md={5} component={Paper} elevation={6} square>
-                    <Box
-                        sx={{
-                            my: 8,
-                            mx: 4,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                        }}
-                    >
-                        <Avatar sx={{ m: 1, bgcolor: 'secondary.main' }}>
-                            <LockOutlinedIcon />
-                        </Avatar>
+                  >
+                    {av.initial}
+                  </Avatar>
+                ))}
+              </Stack>
+              <Box>
+                <Typography sx={{ fontWeight: 700 }}>Trusted by 25,000+ teams</Typography>
+              </Box>
+            </Box>
+          </Box>
+        </Grid>
 
+        <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', px: { xs: 4, md: 8 }, py: { xs: 6, md: 6 }, bgcolor: '#F8FAFC' }}>
+          <motion.div initial="hidden" animate="visible" variants={formVariants} style={{ width: '100%', maxWidth: 460 }}>
+            <Box sx={{ width: '100%', borderRadius: '16px', bgcolor: '#FFFFFF', border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 40px 120px rgba(15,23,42,0.08)', p: { xs: 4, md: 5 } }}>
+              <Stack spacing={3}>
+                <Box>
+                  <Typography sx={{ fontSize: '2.4rem', fontWeight: 900, color: '#0F172A' }}>{activeCard ? 'Welcome Back' : 'Create your workspace'}</Typography>
+                  <Typography sx={{ mt: 1, color: '#64748B' }}>{activeCard ? 'Continue to your workspace' : 'Start collaborating in minutes.'}</Typography>
+                </Box>
 
-                        <div>
-                            <Button variant={formState === 0 ? "contained" : ""} onClick={() => { setFormState(0) }}>
-                                Sign In
-                            </Button>
-                            <Button variant={formState === 1 ? "contained" : ""} onClick={() => { setFormState(1) }}>
-                                Sign Up
-                            </Button>
-                        </div>
+                <Stack direction="row" spacing={2}>
+                  <Button fullWidth startIcon={<GoogleIcon />} sx={{ textTransform: 'none', borderRadius: '10px', py: 1.3, minHeight: 48, color: '#0F172A', border: '1px solid rgba(15,23,42,0.08)', backgroundColor: '#F8FAFC', '&:hover': { backgroundColor: '#F1F5F9', transform: 'translateY(-1px)' } }}>
+                    Google
+                  </Button>
+                  <Button fullWidth startIcon={<GitHubIcon />} sx={{ textTransform: 'none', borderRadius: '10px', py: 1.3, minHeight: 48, color: '#0F172A', border: '1px solid rgba(15,23,42,0.08)', backgroundColor: '#F8FAFC', '&:hover': { backgroundColor: '#F1F5F9', transform: 'translateY(-1px)' } }}>
+                    GitHub
+                  </Button>
+                </Stack>
 
-                        <Box component="form" noValidate sx={{ mt: 1 }}>
-                            {formState === 1 ? <TextField
-                                margin="normal"
-                                required
-                                fullWidth
-                                id="username"
-                                label="Full Name"
-                                name="username"
-                                value={name}
-                                autoFocus
-                                onChange={(e) => setName(e.target.value)}
-                            /> : <></>}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, my: 1.5 }}>
+                  <Box sx={{ flex: 1, height: 1, bgcolor: 'rgba(15,23,42,0.08)' }} />
+                  <Typography sx={{ color: '#64748B', fontSize: 14, whiteSpace: 'nowrap' }}>or continue with email</Typography>
+                  <Box sx={{ flex: 1, height: 1, bgcolor: 'rgba(15,23,42,0.08)' }} />
+                </Box>
 
-                            <TextField
-                                margin="normal"
-                                required
-                                fullWidth
-                                id="username"
-                                label="Username"
-                                name="username"
-                                value={username}
-                                autoFocus
-                                onChange={(e) => setUsername(e.target.value)}
+                <Stack spacing={3}>
+                  {formState === 1 && (
+                    <AuthTextField
+                      label="Full Name"
+                      icon={PersonOutlinedIcon}
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Your full name"
+                    />
+                  )}
 
-                            />
-                            <TextField
-                                margin="normal"
-                                required
-                                fullWidth
-                                name="password"
-                                label="Password"
-                                value={password}
-                                type="password"
-                                onChange={(e) => setPassword(e.target.value)}
+                  <AuthTextField
+                    label="Username"
+                    icon={PersonOutlinedIcon}
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Username or email"
+                    error={!emailValid}
+                    helperText={!emailValid ? 'Enter a valid email or alphanumeric username (min 3 characters)' : ''}
+                  />
 
-                                id="password"
-                            />
+                  <PasswordInput
+                    id="password"
+                    name="password"
+                    label="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
 
-                            <p style={{ color: "red" }}>{error}</p>
+                  {formState === 1 && (
+                    <PasswordInput
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      label="Confirm Password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                  )}
 
-                            <Button
-                                type="button"
-                                fullWidth
-                                variant="contained"
-                                sx={{ mt: 3, mb: 2 }}
-                                onClick={handleAuth}
-                            >
-                                {formState === 0 ? "Login " : "Register"}
-                            </Button>
-
-                        </Box>
+                  {passwordStrength.label && (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: passwordStrength.color, fontWeight: 600, fontSize: 14 }}>
+                      <Typography>{passwordStrength.label} password</Typography>
+                      <Typography>{passwordStrength.score}/4</Typography>
                     </Box>
-                </Grid>
-            </Grid>
+                  )}
+                </Stack>
 
-            <Snackbar
+                {error && (
+                  <Box sx={{ p: 3, borderRadius: 3, bgcolor: 'rgba(248,113,113,0.12)', color: '#B91C1C' }}>
+                    <Typography>{error}</Typography>
+                  </Box>
+                )}
 
-                open={open}
-                autoHideDuration={4000}
-                message={message}
-            />
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ flexWrap: 'wrap', gap: 1 }}>
+                  <FormControlLabel
+                    control={<Checkbox checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} sx={{ color: '#6D4AFF', '&.Mui-checked': { color: '#6D4AFF' } }} />}
+                    label={<Typography sx={{ color: '#64748B' }}>Remember me</Typography>}
+                  />
+                  {activeCard && (
+                    <Link component="button" variant="body2" onClick={() => navigate('/forgot-password')} sx={{ color: '#6D4AFF', fontWeight: 600 }}>
+                      Forgot password?
+                    </Link>
+                  )}
+                </Stack>
 
-        </ThemeProvider>
-    );
+                <Button
+                  fullWidth
+                  onClick={handleAuth}
+                  disabled={loading || (formState === 1 && (!name || !confirmPassword || !emailValid))}
+                  sx={{
+                    py: 1.5,
+                    minHeight: 48,
+                    borderRadius: '10px',
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    background: 'linear-gradient(135deg, #6D4AFF, #8B5CF6)',
+                    color: '#fff',
+                    boxShadow: '0 20px 50px rgba(109,74,255,0.28)',
+                    transition: 'transform 180ms ease, box-shadow 180ms ease',
+                    '&:hover': { transform: 'translateY(-1px)', boxShadow: '0 24px 60px rgba(109,74,255,0.32)' }
+                  }}
+                >
+                  {loading ? <CircularProgress size={20} color="inherit" /> : activeCard ? 'Sign In' : 'Create Account'}
+                </Button>
+
+                <Box sx={{ textAlign: 'center', color: '#64748B' }}>
+                  {activeCard ? (
+                    <>
+                      Don&apos;t have an account?{' '}
+                      <Link component="button" variant="body2" onClick={() => toggleForm(1)} sx={{ color: '#6D4AFF', fontWeight: 700 }}>
+                        Create account →
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      Already have an account?{' '}
+                      <Link component="button" variant="body2" onClick={() => toggleForm(0)} sx={{ color: '#6D4AFF', fontWeight: 700 }}>
+                        Sign In →
+                      </Link>
+                    </>
+                  )}
+                </Box>
+              </Stack>
+            </Box>
+          </motion.div>
+        </Grid>
+      </Grid>
+
+      <Dialog open={successOpen} onClose={() => setSuccessOpen(false)} aria-labelledby="signup-success-title" TransitionComponent={Zoom} keepMounted fullWidth maxWidth="xs">
+        <DialogTitle id="signup-success-title" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <CheckCircleIcon color="success" fontSize="large" />
+          <Typography variant="h6">Signup Successful!</Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Typography>Your account has been created successfully. Please log in to continue.</Typography>
+        </DialogContent>
+        <DialogActions sx={{ pr: 3, pb: 2 }}>
+          <Button onClick={() => setSuccessOpen(false)}>Close</Button>
+          <Button variant="contained" onClick={() => toggleForm(0)} sx={{ backgroundColor: '#6D4AFF', '&:hover': { backgroundColor: '#5B35F8' } }}>
+            Go to Login
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  )
 }
