@@ -48,9 +48,30 @@ const VideoPlayer = ({ stream, version, muted = false, socketId }) => {
         const video = videoRef.current;
         if (!video) return;
 
+        console.log("Incoming stream:", stream);
+        console.log("stream.id:", stream?.id);
+        console.log("stream.active:", stream?.active);
+        console.log("stream tracks:", stream?.getTracks());
+        console.log("video tracks:", stream?.getVideoTracks());
+        console.log("audio tracks:", stream?.getAudioTracks());
+
         if (stream) {
+            console.log("Assigning stream to video");
             video.srcObject = stream;
-            video.play().catch(console.error);
+            console.log(video.srcObject);
+            console.log(video.currentSrc);
+            console.log(video.srcObject === stream);
+            console.log(video.readyState);
+            console.log(video.videoWidth);
+            console.log(video.videoHeight);
+
+            video.play()
+                .then((res) => {
+                    console.log("play() succeeded. Result:", res);
+                })
+                .catch((error) => {
+                    console.error("play() failed. Complete error:", error);
+                });
         } else {
             video.srcObject = null;
         }
