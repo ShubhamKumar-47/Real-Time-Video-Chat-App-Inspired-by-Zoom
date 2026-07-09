@@ -47,7 +47,7 @@ export default function Navbar() {
       }}
     >
       <Container maxWidth="xl" sx={{ maxWidth: 1280 }}>
-        <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 80, px: 0 }}>
+        <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 72, px: 0 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Logo size={42} />
             <Typography variant="h6" component={RouterLink} to="/" sx={{ textDecoration: 'none', color: 'text.primary', fontWeight: 900, letterSpacing: 0.2 }}>

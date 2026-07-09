@@ -135,23 +135,24 @@ export default function Authentication() {
               position: 'absolute', 
               background: 'rgba(255,255,255,0.06)', 
               border: '1px solid rgba(255,255,255,0.12)',
-              width: 190, 
-              height: 74, 
-              borderRadius: '16px', 
-              top: 240, 
-              right: 60, 
+              width: 'fit-content',
+              whiteSpace: 'nowrap',
+              height: 52, 
+              borderRadius: '12px', 
+              top: 40, 
+              right: 40, 
               backdropFilter: 'blur(20px)',
-              boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.1)',
               display: 'flex',
               alignItems: 'center',
-              px: 2.5,
-              gap: 1.5
+              px: 2,
+              gap: 1.2
             }}
           >
-            <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#10B981', boxShadow: '0 0 12px #10B981' }} />
+            <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#10B981', boxShadow: '0 0 10px #10B981' }} />
             <Box>
-              <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', letterSpacing: 1, textTransform: 'uppercase' }}>System Status</Typography>
-              <Typography sx={{ fontSize: 13, fontWeight: 800, color: '#fff', mt: 0.2 }}>All Services Live</Typography>
+              <Typography sx={{ fontSize: 9.5, fontWeight: 800, color: 'rgba(255,255,255,0.6)', letterSpacing: 0.8, textTransform: 'uppercase' }}>System Status</Typography>
+              <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: '#fff', mt: 0.1 }}>All Services Live</Typography>
             </Box>
           </Box>
 
@@ -160,18 +161,18 @@ export default function Authentication() {
           <Box sx={{ position: 'absolute', width: 180, height: 220, top: 140, right: 120, bgcolor: 'rgba(59,130,246,0.08)', borderRadius: 32, filter: 'blur(90px)' }} />
           <Box sx={{ position: 'absolute', width: 220, height: 140, bottom: 60, right: 120, bgcolor: 'rgba(167,139,250,0.12)', borderRadius: 32, filter: 'blur(80px)' }} />
  
-          <Box sx={{ position: 'relative', height: '100%', px: 10, py: 12, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <Box>
-              <Typography sx={{ textTransform: 'uppercase', letterSpacing: 2, color: 'rgba(255,255,255,0.7)', fontWeight: 700, mb: 3 }}>EasyMeet.space</Typography>
-              <Typography sx={{ fontSize: '3.2rem', fontWeight: 900, lineHeight: 1.02, mb: 3 }}>Welcome to EasyMeet.space</Typography>
-              <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 18, maxWidth: 420, lineHeight: 1.8 }}>Secure meetings for modern teams.</Typography>
+          <Box sx={{ position: 'relative', height: '100%', px: 7, py: 9, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <Box sx={{ mt: 2 }}>
+              <Typography sx={{ textTransform: 'uppercase', letterSpacing: 2, color: 'rgba(255,255,255,0.6)', fontWeight: 800, fontSize: 11, mb: 2.5 }}>EasyMeet.space</Typography>
+              <Typography sx={{ fontSize: '2.5rem', fontWeight: 900, lineHeight: 1.1, mb: 2.5, letterSpacing: '-0.02em' }}>Welcome to EasyMeet.space</Typography>
+              <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 16, maxWidth: 380, lineHeight: 1.7 }}>Secure meetings for modern teams.</Typography>
             </Box>
  
-            <Stack spacing={2} sx={{ mt: 6 }}>
+            <Stack spacing={2} sx={{ mt: 4 }}>
               {features.map((item) => (
-                <Box key={item} sx={{ display: 'flex', alignItems: 'center', gap: 2, color: '#fff', opacity: 0.92 }}>
-                  <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: '#6D4AFF', display: 'grid', placeItems: 'center' }}>✓</Box>
-                  <Typography sx={{ fontWeight: 600 }}>{item}</Typography>
+                <Box key={item} sx={{ display: 'flex', alignItems: 'center', gap: 1.8, color: '#fff', opacity: 0.95 }}>
+                  <CheckCircleIcon sx={{ color: '#10B981', fontSize: 20, flexShrink: 0 }} />
+                  <Typography sx={{ fontWeight: 600, fontSize: 15.5 }}>{item}</Typography>
                 </Box>
               ))}
             </Stack>
@@ -350,7 +351,7 @@ export default function Authentication() {
         </DialogContent>
         <DialogActions sx={{ pr: 3, pb: 2 }}>
           <Button onClick={() => setSuccessOpen(false)}>Close</Button>
-          <Button variant="contained" onClick={() => toggleForm(0)} sx={{ backgroundColor: '#6D4AFF', '&:hover': { backgroundColor: '#5B35F8' } }}>
+          <Button variant="contained" onClick={() => { setSuccessOpen(false); toggleForm(0); }} sx={{ backgroundColor: '#6D4AFF', '&:hover': { backgroundColor: '#5B35F8' } }}>
             Go to Login
           </Button>
         </DialogActions>

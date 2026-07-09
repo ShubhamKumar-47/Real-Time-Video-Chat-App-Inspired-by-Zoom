@@ -31,20 +31,22 @@ const theme = createTheme({
   typography: {
     fontFamily: ['"Plus Jakarta Sans"', 'Inter', 'Helvetica', 'Arial', 'sans-serif'].join(','),
     h1: { 
-      fontSize: '34px',
-      '@media (min-width:600px)': { fontSize: '44px' },
-      '@media (min-width:900px)': { fontSize: '56px' },
-      '@media (min-width:1200px)': { fontSize: '64px' },
+      fontSize: '32px',
+      '@media (min-width:600px)': { fontSize: '38px' },
+      '@media (min-width:900px)': { fontSize: '44px' },
+      '@media (min-width:1200px)': { fontSize: '52px' },
       fontWeight: 900, 
-      lineHeight: 1.02 
+      lineHeight: 1.1,
+      letterSpacing: '-0.03em'
     },
     h2: { 
-      fontSize: '28px',
-      '@media (min-width:600px)': { fontSize: '34px' },
-      '@media (min-width:900px)': { fontSize: '38px' },
-      '@media (min-width:1200px)': { fontSize: '44px' },
+      fontSize: '26px',
+      '@media (min-width:600px)': { fontSize: '30px' },
+      '@media (min-width:900px)': { fontSize: '34px' },
+      '@media (min-width:1200px)': { fontSize: '40px' },
       fontWeight: 900, 
-      lineHeight: 1.05 
+      lineHeight: 1.15,
+      letterSpacing: '-0.02em'
     },
     h3: { 
       fontSize: '22px',
