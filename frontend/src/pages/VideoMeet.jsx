@@ -38,7 +38,7 @@ function black({ width = 640, height = 480 } = {}) {
     return Object.assign(stream.getVideoTracks()[0], { enabled: false });
 }
 
-const VideoPlayer = React.memo(({ stream, muted = false, socketId, isLocal = false }) => {
+const VideoPlayer = ({ stream, version, muted = false }) => {
     const videoRef = useRef(null);
 
     useEffect(() => {
@@ -51,7 +51,7 @@ const VideoPlayer = React.memo(({ stream, muted = false, socketId, isLocal = fal
         } else {
             video.srcObject = null;
         }
-    }, [stream]);
+    }, [stream, version]);
 
     return (
         <video
@@ -62,7 +62,7 @@ const VideoPlayer = React.memo(({ stream, muted = false, socketId, isLocal = fal
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
     );
-});
+};
 
 export default function VideoMeetComponent() {
     const { userData } = useContext(AuthContext);
@@ -72,6 +72,7 @@ export default function VideoMeetComponent() {
     let [localStream, setLocalStream] = useState(null);
     const connectionsRef = useRef({});
     const remoteStreamsRef = useRef({});
+    const remoteStreamVersionsRef = useRef({});
 
     let [videoAvailable, setVideoAvailable] = useState(true);
     let [audioAvailable, setAudioAvailable] = useState(true);
@@ -85,7 +86,6 @@ export default function VideoMeetComponent() {
     let [newMessages, setNewMessages] = useState(0);
     let [askForUsername, setAskForUsername] = useState(true);
     let [username, setUsername] = useState("");
-    const videoRef = useRef([])
     const chatEndRef = useRef();
     let [videos, setVideos] = useState([])
 
@@ -406,7 +406,11 @@ export default function VideoMeetComponent() {
 
             socketRef.current.on('user-left', (id) => {
                 console.log("Participant left:", id);
-                setVideos((videos) => videos.filter((video) => video.socketId !== id))
+                setVideos((videos) => {
+                    const updatedVideos = videos.filter((video) => video.socketId !== id);
+                    console.table(updatedVideos);
+                    return updatedVideos;
+                });
                 if (connectionsRef.current[id]) {
                     connectionsRef.current[id].close()
                     delete connectionsRef.current[id]
@@ -441,18 +445,19 @@ export default function VideoMeetComponent() {
                             console.log("Track readyState:", event.track.readyState);
                             console.log("Track enabled:", event.track.enabled);
 
-                            let isNew = false;
                             if (!remoteStreamsRef.current[socketListId]) {
                                 remoteStreamsRef.current[socketListId] = new MediaStream();
-                                isNew = true;
+                                remoteStreamVersionsRef.current[socketListId] = 0;
                             }
                             const remoteStream = remoteStreamsRef.current[socketListId];
 
                             // Prevent duplicate track addition to the same stream
                             if (!remoteStream.getTracks().find(t => t.id === event.track.id)) {
                                 remoteStream.addTrack(event.track);
+                                remoteStreamVersionsRef.current[socketListId] = (remoteStreamVersionsRef.current[socketListId] || 0) + 1;
                                 console.log("Track added to stream for ID:", socketListId);
                             }
+                            const version = remoteStreamVersionsRef.current[socketListId] || 0;
 
                             console.log("remoteStream tracks:", remoteStream.getTracks());
                             console.log("remoteStream video tracks:", remoteStream.getVideoTracks());
@@ -489,31 +494,38 @@ export default function VideoMeetComponent() {
                                 console.log("remoteDescription sdp:", connectionsRef.current[socketListId].remoteDescription.sdp);
                             } catch (e) {}
 
-                            if (isNew) {
-                                let newVideo = {
-                                    socketId: socketListId,
-                                    stream: remoteStream,
-                                    autoplay: true,
-                                    playsinline: true
-                                };
-
-                                setVideos(videos => {
-                                    if (videos.find(v => v.socketId === socketListId)) {
-                                        return videos;
-                                    }
-                                    const updatedVideos = [...videos, newVideo];
-                                    videoRef.current = updatedVideos;
-                                    return updatedVideos;
-                                });
-                            } else {
-                                setVideos(videos => {
-                                    const updatedVideos = videos.map(video =>
-                                        video.socketId === socketListId ? { ...video, stream: remoteStream } : video
+                            setVideos(prevVideos => {
+                                const exists = prevVideos.find(v => v.socketId === socketListId);
+                                let updatedVideos;
+                                if (exists) {
+                                    updatedVideos = prevVideos.map(v =>
+                                        v.socketId === socketListId
+                                            ? { ...v, stream: remoteStream, version: version }
+                                            : v
                                     );
-                                    videoRef.current = updatedVideos;
-                                    return updatedVideos;
-                                });
-                            }
+                                } else {
+                                    const newVideo = {
+                                        socketId: socketListId,
+                                        stream: remoteStream,
+                                        version: version,
+                                        autoplay: true,
+                                        playsinline: true
+                                    };
+                                    updatedVideos = [...prevVideos, newVideo];
+                                }
+                                
+                                // Verify that videos state never contains duplicate socketIds
+                                const uniqueVideos = [];
+                                const seenSocketIds = new Set();
+                                for (let video of updatedVideos) {
+                                    if (!seenSocketIds.has(video.socketId)) {
+                                        seenSocketIds.add(video.socketId);
+                                        uniqueVideos.push(video);
+                                    }
+                                }
+                                console.table(uniqueVideos);
+                                return uniqueVideos;
+                            });
                         };
 
                         // Add the local video tracks
@@ -621,7 +633,7 @@ export default function VideoMeetComponent() {
                             <Grid size={{ xs: 12, md: 6 }}>
                                 <div style={{ position: 'relative', width: '100%' }}>
                                     <div className={styles.lobbyVideoPreview}>
-                                        <VideoPlayer stream={localStream} muted={true} isLocal={true} />
+                                        <VideoPlayer stream={localStream} muted={true} />
                                     </div>
                                     <Box sx={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 2, zIndex: 10 }}>
                                         <IconButton 
@@ -684,7 +696,7 @@ export default function VideoMeetComponent() {
                         <div className={styles.conferenceView}>
                             {videos.map((video) => (
                                 <div key={video.socketId} className={styles.videoCard}>
-                                    <VideoPlayer stream={video.stream} muted={false} socketId={video.socketId} isLocal={false} />
+                                    <VideoPlayer stream={video.stream} version={video.version} muted={false} />
                                     <div className={styles.participantName}>
                                         Participant ({video.socketId.substring(0, 5)})
                                     </div>
@@ -727,7 +739,7 @@ export default function VideoMeetComponent() {
 
                         {/* Local PIP Video */}
                         <div className={styles.localFloatingCard}>
-                            <VideoPlayer stream={localStream} muted={true} isLocal={true} />
+                            <VideoPlayer stream={localStream} muted={true} />
                             <div className={styles.participantName}>You ({username})</div>
                         </div>
 
