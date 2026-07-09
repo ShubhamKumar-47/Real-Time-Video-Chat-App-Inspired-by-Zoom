@@ -42,71 +42,16 @@ const VideoPlayer = React.memo(({ stream, muted = false, socketId, isLocal = fal
     const videoRef = useRef(null);
 
     useEffect(() => {
-        console.log("VideoPlayer Component Mounted. Stream ID:", stream?.id, "Socket ID:", socketId, "isLocal:", isLocal);
-        return () => {
-            console.log("VideoPlayer Component Unmounted. Stream ID:", stream?.id, "Socket ID:", socketId, "isLocal:", isLocal);
-        };
-    }, []);
-
-    useEffect(() => {
-        console.log("VideoPlayer Component Updated. Stream ID:", stream?.id, "Socket ID:", socketId, "isLocal:", isLocal);
         const video = videoRef.current;
         if (!video) return;
 
         if (stream) {
             video.srcObject = stream;
-            
-            // Full media debugging as required by Task 8
-            console.log("videoWidth", video.videoWidth);
-            console.log("videoHeight", video.videoHeight);
-            console.log("readyState", video.readyState);
-            console.log("paused", video.paused);
-            console.log("networkState", video.networkState);
-            try {
-                console.log("Tracks", stream.getTracks());
-                console.log("VideoTracks", stream.getVideoTracks());
-                console.log("AudioTracks", stream.getAudioTracks());
-            } catch (e) {}
-
-            // Assign standard event logs
-            video.onloadedmetadata = () => {
-                console.log("videoWidth", video.videoWidth);
-                console.log("videoHeight", video.videoHeight);
-            };
-            video.onloadeddata = () => console.log("onloadeddata");
-            video.oncanplay = () => console.log("oncanplay");
-            
-            video.onplaying = () => {
-                console.log("VIDEO PLAYING");
-                const rect = video.getBoundingClientRect();
-                console.log("getBoundingClientRect():", rect);
-                console.log("offsetWidth:", video.offsetWidth, "offsetHeight:", video.offsetHeight);
-                console.log("clientWidth:", video.clientWidth, "clientHeight:", video.clientHeight);
-                try {
-                    const computed = window.getComputedStyle(video);
-                    console.log("computedStyle.display:", computed.display);
-                    console.log("computedStyle.visibility:", computed.visibility);
-                    console.log("computedStyle.opacity:", computed.opacity);
-                    console.log("computedStyle.zIndex:", computed.zIndex);
-                    console.log("computedStyle.position:", computed.position);
-                    console.log("computedStyle.objectFit:", computed.objectFit);
-                    console.log("computedStyle.transform:", computed.transform);
-                    console.log("computedStyle.pointerEvents:", computed.pointerEvents);
-                } catch (err) {}
-            };
-            
-            video.onpause = () => console.log("onpause");
-            video.onwaiting = () => console.log("onwaiting");
-            video.onstalled = () => console.log("onstalled");
-            video.onerror = console.error;
-            video.onemptied = () => console.log("onemptied");
-            video.onsuspend = () => console.log("onsuspend");
-
             video.play().catch(console.error);
         } else {
             video.srcObject = null;
         }
-    }, [stream, muted, socketId, isLocal]);
+    }, [stream]);
 
     return (
         <video
@@ -114,26 +59,7 @@ const VideoPlayer = React.memo(({ stream, muted = false, socketId, isLocal = fal
             autoPlay
             playsInline
             muted={muted}
-            style={isLocal ? {
-                width: '100%',
-                height: '100%',
-                display: 'block',
-                visibility: 'visible',
-                opacity: 1,
-                border: '5px solid lime',
-                objectFit: 'cover'
-            } : {
-                width: '400px',
-                height: '300px',
-                display: 'block',
-                visibility: 'visible',
-                opacity: 1,
-                position: 'relative',
-                zIndex: 99999,
-                background: 'red',
-                border: '5px solid lime',
-                objectFit: 'cover'
-            }}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
     );
 });
@@ -515,8 +441,10 @@ export default function VideoMeetComponent() {
                             console.log("Track readyState:", event.track.readyState);
                             console.log("Track enabled:", event.track.enabled);
 
+                            let isNew = false;
                             if (!remoteStreamsRef.current[socketListId]) {
                                 remoteStreamsRef.current[socketListId] = new MediaStream();
+                                isNew = true;
                             }
                             const remoteStream = remoteStreamsRef.current[socketListId];
 
@@ -561,17 +489,7 @@ export default function VideoMeetComponent() {
                                 console.log("remoteDescription sdp:", connectionsRef.current[socketListId].remoteDescription.sdp);
                             } catch (e) {}
 
-                            let videoExists = videoRef.current.find(video => video.socketId === socketListId);
-
-                            if (videoExists) {
-                                setVideos(videos => {
-                                    const updatedVideos = videos.map(video =>
-                                        video.socketId === socketListId ? { ...video, stream: remoteStream } : video
-                                    );
-                                    videoRef.current = updatedVideos;
-                                    return updatedVideos;
-                                });
-                            } else {
+                            if (isNew) {
                                 let newVideo = {
                                     socketId: socketListId,
                                     stream: remoteStream,
@@ -580,7 +498,18 @@ export default function VideoMeetComponent() {
                                 };
 
                                 setVideos(videos => {
+                                    if (videos.find(v => v.socketId === socketListId)) {
+                                        return videos;
+                                    }
                                     const updatedVideos = [...videos, newVideo];
+                                    videoRef.current = updatedVideos;
+                                    return updatedVideos;
+                                });
+                            } else {
+                                setVideos(videos => {
+                                    const updatedVideos = videos.map(video =>
+                                        video.socketId === socketListId ? { ...video, stream: remoteStream } : video
+                                    );
                                     videoRef.current = updatedVideos;
                                     return updatedVideos;
                                 });
