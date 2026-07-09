@@ -5,71 +5,73 @@ import { connectToSocket } from "./controllers/socketManager.js";
 import cors from "cors";
 import userRoutes from "./routes/users.routes.js";
 import dotenv from "dotenv";
-import path from "path";
-import { fileURLToPath } from "url";
 
-// 🔥 Fix for ES Module __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// ✅ Explicitly load .env from backend root and override any existing vars
-// dotenv v17 supports the `override` option so local .env values win during development
-dotenv.config({ path: path.join(__dirname, "../.env"), override: true });
+dotenv.config();
 
 const app = express();
 const server = createServer(app);
-const io = connectToSocket(server);
 
-// ✅ Correct Port Setup
+connectToSocket(server);
+
 const PORT = process.env.PORT || 8000;
 
 const allowedOrigins = [
     process.env.FRONTEND_URL,
-    "https://www.easymeet.space",
     "https://easymeet.space",
+    "https://www.easymeet.space",
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:5175",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
-    "http://127.0.0.1:5175"
+    "http://127.0.0.1:5175",
+    "https://real-time-video-chat-app-inspired-by-zoom.vercel.app",
 ].filter(Boolean);
 
-app.use(cors({
-    origin: function (origin, callback) {
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes("*")) {
-            return callback(null, true);
-        }
-        if (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:")) {
-            return callback(null, true);
-        }
-        return callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true
-}));
+app.use(
+    cors({
+        origin(origin, callback) {
+            if (!origin) return callback(null, true);
+
+            if (
+                allowedOrigins.includes(origin) ||
+                origin.startsWith("http://localhost:") ||
+                origin.startsWith("http://127.0.0.1:")
+            ) {
+                return callback(null, true);
+            }
+
+            return callback(new Error("Not allowed by CORS"));
+        },
+        credentials: true,
+    })
+);
 
 app.use(express.json({ limit: "40kb" }));
-app.use(express.urlencoded({ limit: "40kb", extended: true }));
+app.use(express.urlencoded({ extended: true, limit: "40kb" }));
 
 app.use("/api/v1/users", userRoutes);
 
 const start = async () => {
     try {
+        if (!process.env.MONGO_URI) {
+            throw new Error("MONGO_URI is missing");
+        }
 
-        // show which MONGO_URI is being used (helpful when multiple env sources exist)
-        console.log('Using MONGO_URI:', process.env.MONGO_URI?.startsWith('mongodb') ? (process.env.MONGO_URI.includes('@') ? process.env.MONGO_URI.split('@').pop() : process.env.MONGO_URI) : process.env.MONGO_URI);
+        console.log("Connecting to MongoDB...");
 
-        const connectionDb = await mongoose.connect(process.env.MONGO_URI);
+        const connection = await mongoose.connect(process.env.MONGO_URI);
 
-        console.log(`MONGO Connected DB Host: ${connectionDb.connection.host}`);
+        console.log(
+            `MongoDB Connected: ${connection.connection.host}`
+        );
 
         server.listen(PORT, () => {
-            console.log(`SERVER RUNNING ON PORT ${PORT}`);
+            console.log(`Server running on port ${PORT}`);
         });
-
     } catch (error) {
-        console.error("Database Connection Failed:", error);
+        console.error("Database Connection Failed:");
+        console.error(error);
         process.exit(1);
     }
 };
