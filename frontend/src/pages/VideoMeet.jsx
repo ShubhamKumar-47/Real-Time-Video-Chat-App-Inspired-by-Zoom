@@ -113,6 +113,64 @@ export default function VideoMeetComponent() {
     const chatEndRef = useRef();
     let [videos, setVideos] = useState([])
 
+    const runStatsAudit = async (socketListId) => {
+        try {
+            const pc = connectionsRef.current[socketListId];
+            if (!pc) return;
+            
+            // Wait 1.5 seconds for media packet flow
+            await new Promise(r => setTimeout(r, 1500));
+            
+            const stats = await pc.getStats();
+            console.log(`--- WEBRTC STATS AUDIT FOR ${socketListId} ---`);
+            
+            stats.forEach(report => {
+                if (report.type === 'inbound-rtp' && report.mediaType === 'video') {
+                    console.log(`[Inbound RTP Video]`, {
+                        framesReceived: report.framesReceived,
+                        framesDecoded: report.framesDecoded,
+                        framesDropped: report.framesDropped,
+                        packetsReceived: report.packetsReceived,
+                        bytesReceived: report.bytesReceived,
+                        jitter: report.jitter,
+                        pliCount: report.pliCount,
+                        firCount: report.firCount
+                    });
+                }
+                
+                if (report.type === 'outbound-rtp') {
+                    console.log(`[Outbound RTP ${report.mediaType}]`, {
+                        framesSent: report.framesSent,
+                        packetsSent: report.packetsSent,
+                        bytesSent: report.bytesSent
+                    });
+                }
+                
+                if (report.type === 'codec') {
+                    console.log(`[Codec] mimeType: ${report.mimeType}, clockRate: ${report.clockRate}`);
+                }
+                
+                if (report.type === 'candidate-pair') {
+                    console.log(`[Candidate Pair] state: ${report.state}, currentRoundTripTime: ${report.currentRoundTripTime}, selected: ${report.selected}`);
+                }
+                
+                if (report.type === 'transport') {
+                    console.log(`[Transport] state: ${report.state}, dtlsState: ${report.dtlsState}`);
+                }
+            });
+            
+            try {
+                pc.getTransceivers().forEach(t => {
+                    console.log(`[Transceiver] direction: ${t.direction}, currentDirection: ${t.currentDirection}`);
+                });
+            } catch (e) {}
+            
+            console.log(`-------------------------------------------`);
+        } catch (err) {
+            console.error("Stats audit error:", err);
+        }
+    };
+
     useEffect(() => {
         console.log("VIDEOS RENDER", videos);
     }, [videos]);
@@ -247,6 +305,7 @@ export default function VideoMeetComponent() {
                     }).catch(e => console.log("replaceTrack error:", e));
                 } else {
                     console.log("Adding local tracks to ID:", id);
+                    connectionsRef.current[id].isInitiator = true;
                     connectionsRef.current[id].addTrack(videoTrack, window.localStream);
                 }
             }
@@ -260,18 +319,10 @@ export default function VideoMeetComponent() {
                     }).catch(e => console.log("replaceTrack error:", e));
                 } else {
                     console.log("Adding local tracks to ID:", id);
+                    connectionsRef.current[id].isInitiator = true;
                     connectionsRef.current[id].addTrack(audioTrack, window.localStream);
                 }
             }
-
-            console.log("Creating offer for ID:", id);
-            connectionsRef.current[id].createOffer().then((description) => {
-                connectionsRef.current[id].setLocalDescription(description)
-                    .then(() => {
-                        socketRef.current.emit('signal', id, JSON.stringify({ 'sdp': connectionsRef.current[id].localDescription }))
-                    })
-                    .catch(e => console.log(e))
-            }).catch(e => console.log(e))
         }
 
         stream.getTracks().forEach(track => track.onended = () => {
@@ -301,6 +352,7 @@ export default function VideoMeetComponent() {
                     if (videoSender) {
                         videoSender.replaceTrack(fallbackVideoTrack).catch(e => console.log(e));
                     } else {
+                        connectionsRef.current[id].isInitiator = true;
                         connectionsRef.current[id].addTrack(fallbackVideoTrack, window.localStream);
                     }
                 }
@@ -310,18 +362,10 @@ export default function VideoMeetComponent() {
                     if (audioSender) {
                         audioSender.replaceTrack(fallbackAudioTrack).catch(e => console.log(e));
                     } else {
+                        connectionsRef.current[id].isInitiator = true;
                         connectionsRef.current[id].addTrack(fallbackAudioTrack, window.localStream);
                     }
                 }
-
-                console.log("Creating offer for ID:", id);
-                connectionsRef.current[id].createOffer().then((description) => {
-                    connectionsRef.current[id].setLocalDescription(description)
-                        .then(() => {
-                            socketRef.current.emit('signal', id, JSON.stringify({ 'sdp': connectionsRef.current[id].localDescription }))
-                        })
-                        .catch(e => console.log(e))
-                }).catch(e => console.log(e))
             }
         })
     }
@@ -366,17 +410,9 @@ export default function VideoMeetComponent() {
                 }).catch(e => console.log("replaceTrack error:", e));
             } else if (videoTrack) {
                 console.log("Adding local tracks to ID:", id);
+                connectionsRef.current[id].isInitiator = true;
                 connectionsRef.current[id].addTrack(videoTrack, window.localStream);
             }
-
-            console.log("Creating offer for ID:", id);
-            connectionsRef.current[id].createOffer().then((description) => {
-                connectionsRef.current[id].setLocalDescription(description)
-                    .then(() => {
-                        socketRef.current.emit('signal', id, JSON.stringify({ 'sdp': connectionsRef.current[id].localDescription }))
-                    })
-                    .catch(e => console.log(e))
-            }).catch(e => console.log(e))
         }
 
         stream.getTracks().forEach(track => track.onended = () => {
@@ -450,29 +486,78 @@ export default function VideoMeetComponent() {
                 console.log("Participant joined:", id);
                 clients.forEach((socketListId) => {
                     if (connectionsRef.current[socketListId] === undefined) {
-                        connectionsRef.current[socketListId] = new RTCPeerConnection(peerConfigConnections)
+                        const pc = new RTCPeerConnection(peerConfigConnections);
+                        connectionsRef.current[socketListId] = pc;
                         
+                        // Set initiator flag
+                        pc.isInitiator = (id === socketIdRef.current);
+                        console.log(`Connection initialized for ${socketListId}, isInitiator:`, pc.isInitiator);
+
+                        // Attach state changeloggers
+                        pc.onsignalingstatechange = () => {
+                            console.log(`Connection ${socketListId} signalingState:`, pc.signalingState);
+                        };
+                        pc.onconnectionstatechange = () => {
+                            console.log(`Connection ${socketListId} connectionState:`, pc.connectionState);
+                            if (pc.connectionState === "connected") {
+                                console.log("Peer connected:", socketListId);
+                                runStatsAudit(socketListId);
+                            }
+                        };
+                        pc.oniceconnectionstatechange = () => {
+                            console.log(`Connection ${socketListId} iceConnectionState:`, pc.iceConnectionState);
+                        };
+                        pc.onicegatheringstatechange = () => {
+                            console.log(`Connection ${socketListId} iceGatheringState:`, pc.iceGatheringState);
+                        };
+
                         // Wait for their ice candidate       
-                        connectionsRef.current[socketListId].onicecandidate = function (event) {
+                        pc.onicecandidate = function (event) {
                             if (event.candidate != null) {
                                 console.log("ICE Candidate for ID:", socketListId);
                                 socketRef.current.emit('signal', socketListId, JSON.stringify({ 'ice': event.candidate }))
                             }
                         }
 
-                        // Wait for connection state to change
-                        connectionsRef.current[socketListId].onconnectionstatechange = () => {
-                            if (connectionsRef.current[socketListId] && connectionsRef.current[socketListId].connectionState === "connected") {
-                                console.log("Peer connected:", socketListId);
+                        // Handle negotiation needed
+                        pc.onnegotiationneeded = async () => {
+                            console.log("onnegotiationneeded fired for ID:", socketListId, "isInitiator:", pc.isInitiator);
+                            if (!pc.isInitiator) {
+                                console.log("Not initiator for ID:", socketListId, "- skipping offer creation");
+                                return;
                             }
-                        }
+                            try {
+                                if (pc.signalingState !== "stable") {
+                                    console.log("Signaling state is not stable, skipping createOffer:", pc.signalingState);
+                                    return;
+                                }
+                                console.log("Creating offer for ID (via negotiationneeded):", socketListId);
+                                const description = await pc.createOffer();
+                                await pc.setLocalDescription(description);
+                                socketRef.current.emit('signal', socketListId, JSON.stringify({ 'sdp': pc.localDescription }));
+                            } catch (e) {
+                                console.error("onnegotiationneeded error:", e);
+                            }
+                        };
 
                         // Wait for their video track (modern API)
-                        connectionsRef.current[socketListId].ontrack = (event) => {
+                        pc.ontrack = (event) => {
                             console.log("Received remote track from:", socketListId);
                             console.log("Track kind:", event.track.kind);
                             console.log("Track readyState:", event.track.readyState);
                             console.log("Track enabled:", event.track.enabled);
+                            console.log("Track muted:", event.track.muted);
+
+                            // Attach event listeners as requested
+                            event.track.onunmute = () => {
+                                console.log(`[Track onunmute] Kind: ${event.track.kind}, ID: ${event.track.id}`);
+                            };
+                            event.track.onmute = () => {
+                                console.log(`[Track onmute] Kind: ${event.track.kind}, ID: ${event.track.id}`);
+                            };
+                            event.track.onended = () => {
+                                console.log(`[Track onended] Kind: ${event.track.kind}, ID: ${event.track.id}`);
+                            };
 
                             if (!remoteStreamsRef.current[socketListId]) {
                                 remoteStreamsRef.current[socketListId] = new MediaStream();
@@ -494,7 +579,7 @@ export default function VideoMeetComponent() {
 
                             // Verify every sender track properties as requested by Task 10
                             try {
-                                connectionsRef.current[socketListId].getSenders().forEach(sender => {
+                                pc.getSenders().forEach(sender => {
                                     if (sender.track) {
                                         console.log("sender track kind:", sender.track.kind, "readyState:", sender.track.readyState, "enabled:", sender.track.enabled, "muted:", sender.track.muted);
                                     }
@@ -503,7 +588,7 @@ export default function VideoMeetComponent() {
 
                             // Verify every receiver track properties as requested by Task 11
                             try {
-                                connectionsRef.current[socketListId].getReceivers().forEach(receiver => {
+                                pc.getReceivers().forEach(receiver => {
                                     if (receiver.track) {
                                         console.log("receiver track kind:", receiver.track.kind, "readyState:", receiver.track.readyState, "enabled:", receiver.track.enabled, "muted:", receiver.track.muted);
                                     }
@@ -512,15 +597,15 @@ export default function VideoMeetComponent() {
 
                             // Verify transceivers as requested by Task 12
                             try {
-                                connectionsRef.current[socketListId].getTransceivers().forEach(transceiver => {
+                                pc.getTransceivers().forEach(transceiver => {
                                     console.log("transceiver direction:", transceiver.direction, "currentDirection:", transceiver.currentDirection);
                                 });
                             } catch (e) {}
 
                             // Verify SDP as requested by Task 13
                             try {
-                                console.log("localDescription sdp:", connectionsRef.current[socketListId].localDescription.sdp);
-                                console.log("remoteDescription sdp:", connectionsRef.current[socketListId].remoteDescription.sdp);
+                                console.log("localDescription sdp:", pc.localDescription.sdp);
+                                console.log("remoteDescription sdp:", pc.remoteDescription.sdp);
                             } catch (e) {}
 
                             setVideos(prevVideos => {
@@ -558,14 +643,18 @@ export default function VideoMeetComponent() {
                             });
                         };
 
-                        // Add the local video tracks
+                        // Add local video tracks ensuring no duplicate additions
                         if (window.localStream !== undefined && window.localStream !== null) {
                             console.log("Local stream tracks before adding:", window.localStream.getTracks());
                             console.log("Local stream video tracks:", window.localStream.getVideoTracks());
                             console.log("Local stream audio tracks:", window.localStream.getAudioTracks());
                             console.log("Adding local tracks to ID:", socketListId);
                             window.localStream.getTracks().forEach(track => {
-                                connectionsRef.current[socketListId].addTrack(track, window.localStream);
+                                const senders = pc.getSenders();
+                                const alreadyAdded = senders.find(s => s.track === track);
+                                if (!alreadyAdded) {
+                                    pc.addTrack(track, window.localStream);
+                                }
                             });
                         } else {
                             let blackSilence = (...args) => new MediaStream([black(...args), silence()])
@@ -573,26 +662,15 @@ export default function VideoMeetComponent() {
                             console.log("Local stream tracks before adding (fallback):", window.localStream.getTracks());
                             console.log("Adding local tracks to ID:", socketListId);
                             window.localStream.getTracks().forEach(track => {
-                                connectionsRef.current[socketListId].addTrack(track, window.localStream);
+                                const senders = pc.getSenders();
+                                const alreadyAdded = senders.find(s => s.track === track);
+                                if (!alreadyAdded) {
+                                    pc.addTrack(track, window.localStream);
+                                }
                             });
                         }
                     }
                 })
-
-                if (id === socketIdRef.current) {
-                    for (let id2 in connectionsRef.current) {
-                        if (id2 === socketIdRef.current) continue
-
-                        console.log("Creating offer for ID:", id2);
-                        connectionsRef.current[id2].createOffer().then((description) => {
-                            connectionsRef.current[id2].setLocalDescription(description)
-                                .then(() => {
-                                    socketRef.current.emit('signal', id2, JSON.stringify({ 'sdp': connectionsRef.current[id2].localDescription }))
-                                })
-                                .catch(e => console.log(e))
-                        }).catch(e => console.log(e))
-                    }
-                }
             })
         })
     }
