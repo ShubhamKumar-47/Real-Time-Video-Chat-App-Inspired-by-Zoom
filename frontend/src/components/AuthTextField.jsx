@@ -10,7 +10,7 @@ export default function AuthTextField({ icon: Icon, InputProps, sx, ...props }) 
       InputLabelProps={{ shrink: true }}
       sx={{
         '& .MuiOutlinedInput-root': {
-          height: 56,
+          height: 48,
           borderRadius: '10px',
           backgroundColor: '#F8FAFC',
           border: '1px solid rgba(15,23,42,0.08)',

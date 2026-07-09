@@ -22,6 +22,22 @@ const peerConfigConnections = {
     ]
 }
 
+function silence() {
+    let ctx = new (window.AudioContext || window.webkitAudioContext)();
+    let oscillator = ctx.createOscillator();
+    let dst = oscillator.connect(ctx.createMediaStreamDestination());
+    oscillator.start();
+    ctx.resume();
+    return Object.assign(dst.stream.getAudioTracks()[0], { enabled: false });
+}
+
+function black({ width = 640, height = 480 } = {}) {
+    let canvas = Object.assign(document.createElement("canvas"), { width, height });
+    canvas.getContext('2d').fillRect(0, 0, width, height);
+    let stream = canvas.captureStream();
+    return Object.assign(stream.getVideoTracks()[0], { enabled: false });
+}
+
 export default function VideoMeetComponent() {
     const { userData } = useContext(AuthContext);
 
@@ -297,6 +313,10 @@ export default function VideoMeetComponent() {
 
             socketRef.current.on('user-left', (id) => {
                 setVideos((videos) => videos.filter((video) => video.socketId !== id))
+                if (connectionsRef.current[id]) {
+                    connectionsRef.current[id].close()
+                    delete connectionsRef.current[id]
+                }
             })
 
             socketRef.current.on('user-joined', (id, clients) => {
@@ -369,21 +389,6 @@ export default function VideoMeetComponent() {
         })
     }
 
-    let silence = () => {
-        let ctx = new AudioContext()
-        let oscillator = ctx.createOscillator()
-        let dst = oscillator.connect(ctx.createMediaStreamDestination())
-        oscillator.start()
-        ctx.resume()
-        return Object.assign(dst.stream.getAudioTracks()[0], { enabled: false })
-    }
-    
-    let black = ({ width = 640, height = 480 } = {}) => {
-        let canvas = Object.assign(document.createElement("canvas"), { width, height })
-        canvas.getContext('2d').fillRect(0, 0, width, height)
-        let stream = canvas.captureStream()
-        return Object.assign(stream.getVideoTracks()[0], { enabled: false })
-    }
 
     let handleVideo = () => {
         const newValue = !video;
@@ -441,7 +446,7 @@ export default function VideoMeetComponent() {
     }
 
     return (
-        <div className={styles.meetVideoContainer}>
+        <div className={styles.meetVideoContainer} style={askForUsername ? { height: 'auto', minHeight: '100vh', overflow: 'auto' } : {}}>
             {askForUsername === true ? (
                 <div className={styles.lobbyContainer}>
                     <div className={styles.lobbyCard}>

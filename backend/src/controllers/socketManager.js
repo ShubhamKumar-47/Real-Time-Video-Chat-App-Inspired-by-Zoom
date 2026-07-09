@@ -108,7 +108,7 @@ export const connectToSocket = (server) => {
 
             }
 
-
+            delete timeOnline[socket.id]
         })
 
 

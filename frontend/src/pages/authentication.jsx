@@ -209,31 +209,31 @@ export default function Authentication() {
           </Box>
         </Grid>
 
-        <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', px: { xs: 4, md: 8 }, py: { xs: 6, md: 6 }, bgcolor: '#F8FAFC' }}>
-          <motion.div initial="hidden" animate="visible" variants={formVariants} style={{ width: '100%', maxWidth: 460 }}>
-            <Box sx={{ width: '100%', borderRadius: '16px', bgcolor: '#FFFFFF', border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 40px 120px rgba(15,23,42,0.08)', p: { xs: 4, md: 5 } }}>
-              <Stack spacing={3}>
-                <Box>
-                  <Typography sx={{ fontSize: '2.4rem', fontWeight: 900, color: '#0F172A' }}>{activeCard ? 'Welcome Back' : 'Create your workspace'}</Typography>
-                  <Typography sx={{ mt: 1, color: '#64748B' }}>{activeCard ? 'Continue to your workspace' : 'Start collaborating in minutes.'}</Typography>
+        <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', px: { xs: 3, md: 6 }, py: { xs: 4, md: 4 }, bgcolor: '#F8FAFC' }}>
+          <motion.div initial="hidden" animate="visible" variants={formVariants} style={{ width: '100%', maxWidth: 450 }}>
+            <Box sx={{ width: '100%', borderRadius: '16px', bgcolor: '#FFFFFF', border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 30px 90px rgba(15,23,42,0.05)', p: { xs: 3, md: 4 } }}>
+              <Stack spacing={2.2}>
+                <Box sx={{ mb: 0.5 }}>
+                  <Typography sx={{ fontSize: '2.1rem', fontWeight: 900, color: '#0F172A', letterSpacing: '-0.02em' }}>{activeCard ? 'Welcome Back' : 'Create your workspace'}</Typography>
+                  <Typography sx={{ mt: 0.5, color: '#64748B', fontSize: 14.5 }}>{activeCard ? 'Continue to your workspace' : 'Start collaborating in minutes.'}</Typography>
                 </Box>
 
                 <Stack direction="row" spacing={2}>
-                  <Button fullWidth startIcon={<GoogleIcon />} sx={{ textTransform: 'none', borderRadius: '10px', py: 1.3, minHeight: 48, color: '#0F172A', border: '1px solid rgba(15,23,42,0.08)', backgroundColor: '#F8FAFC', '&:hover': { backgroundColor: '#F1F5F9', transform: 'translateY(-1px)' } }}>
+                  <Button fullWidth startIcon={<GoogleIcon />} sx={{ textTransform: 'none', borderRadius: '10px', py: 1, minHeight: 40, color: '#0F172A', border: '1px solid rgba(15,23,42,0.08)', backgroundColor: '#F8FAFC', fontSize: 13.5, '&:hover': { backgroundColor: '#F1F5F9', transform: 'translateY(-1px)' } }}>
                     Google
                   </Button>
-                  <Button fullWidth startIcon={<GitHubIcon />} sx={{ textTransform: 'none', borderRadius: '10px', py: 1.3, minHeight: 48, color: '#0F172A', border: '1px solid rgba(15,23,42,0.08)', backgroundColor: '#F8FAFC', '&:hover': { backgroundColor: '#F1F5F9', transform: 'translateY(-1px)' } }}>
+                  <Button fullWidth startIcon={<GitHubIcon />} sx={{ textTransform: 'none', borderRadius: '10px', py: 1, minHeight: 40, color: '#0F172A', border: '1px solid rgba(15,23,42,0.08)', backgroundColor: '#F8FAFC', fontSize: 13.5, '&:hover': { backgroundColor: '#F1F5F9', transform: 'translateY(-1px)' } }}>
                     GitHub
                   </Button>
                 </Stack>
 
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, my: 1.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, my: 1 }}>
                   <Box sx={{ flex: 1, height: 1, bgcolor: 'rgba(15,23,42,0.08)' }} />
-                  <Typography sx={{ color: '#64748B', fontSize: 14, whiteSpace: 'nowrap' }}>or continue with email</Typography>
+                  <Typography sx={{ color: '#64748B', fontSize: 13, whiteSpace: 'nowrap' }}>or continue with email</Typography>
                   <Box sx={{ flex: 1, height: 1, bgcolor: 'rgba(15,23,42,0.08)' }} />
                 </Box>
 
-                <Stack spacing={3}>
+                <Stack spacing={2}>
                   {formState === 1 && (
                     <AuthTextField
                       label="Full Name"
@@ -273,26 +273,26 @@ export default function Authentication() {
                   )}
 
                   {passwordStrength.label && (
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: passwordStrength.color, fontWeight: 600, fontSize: 14 }}>
-                      <Typography>{passwordStrength.label} password</Typography>
-                      <Typography>{passwordStrength.score}/4</Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: passwordStrength.color, fontWeight: 600, fontSize: 13 }}>
+                      <Typography sx={{ fontSize: 12.5 }}>{passwordStrength.label} password</Typography>
+                      <Typography sx={{ fontSize: 12.5 }}>{passwordStrength.score}/4</Typography>
                     </Box>
                   )}
                 </Stack>
 
                 {error && (
-                  <Box sx={{ p: 3, borderRadius: 3, bgcolor: 'rgba(248,113,113,0.12)', color: '#B91C1C' }}>
-                    <Typography>{error}</Typography>
+                  <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: 'rgba(248,113,113,0.1)', color: '#B91C1C' }}>
+                    <Typography sx={{ fontSize: 13.5 }}>{error}</Typography>
                   </Box>
                 )}
 
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ flexWrap: 'wrap', gap: 1 }}>
                   <FormControlLabel
                     control={<Checkbox checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} sx={{ color: '#6D4AFF', '&.Mui-checked': { color: '#6D4AFF' } }} />}
-                    label={<Typography sx={{ color: '#64748B' }}>Remember me</Typography>}
+                    label={<Typography sx={{ color: '#64748B', fontSize: 13.5 }}>Remember me</Typography>}
                   />
                   {activeCard && (
-                    <Link component="button" variant="body2" onClick={() => navigate('/forgot-password')} sx={{ color: '#6D4AFF', fontWeight: 600 }}>
+                    <Link component="button" variant="body2" onClick={() => navigate('/forgot-password')} sx={{ color: '#6D4AFF', fontWeight: 600, fontSize: 13.5 }}>
                       Forgot password?
                     </Link>
                   )}
@@ -303,20 +303,22 @@ export default function Authentication() {
                   onClick={handleAuth}
                   disabled={loading || (formState === 1 && (!name || !confirmPassword || !emailValid))}
                   sx={{
-                    py: 1.5,
-                    minHeight: 48,
+                    py: 1.2,
+                    minHeight: 44,
                     borderRadius: '10px',
                     textTransform: 'none',
                     fontWeight: 700,
+                    fontSize: 14.5,
                     background: 'linear-gradient(135deg, #6D4AFF, #8B5CF6)',
                     color: '#fff',
-                    boxShadow: '0 20px 50px rgba(109,74,255,0.28)',
+                    boxShadow: '0 16px 40px rgba(109,74,255,0.22)',
                     transition: 'transform 180ms ease, box-shadow 180ms ease',
-                    '&:hover': { transform: 'translateY(-1px)', boxShadow: '0 24px 60px rgba(109,74,255,0.32)' }
+                    '&:hover': { transform: 'translateY(-1px)', boxShadow: '0 20px 48px rgba(109,74,255,0.26)' }
                   }}
                 >
-                  {loading ? <CircularProgress size={20} color="inherit" /> : activeCard ? 'Sign In' : 'Create Account'}
+                  {loading ? <CircularProgress size={18} color="inherit" /> : activeCard ? 'Sign In' : 'Create Account'}
                 </Button>
+
 
                 <Box sx={{ textAlign: 'center', color: '#64748B' }}>
                   {activeCard ? (
