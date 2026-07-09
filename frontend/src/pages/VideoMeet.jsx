@@ -38,10 +38,13 @@ function black({ width = 640, height = 480 } = {}) {
     return Object.assign(stream.getVideoTracks()[0], { enabled: false });
 }
 
-const VideoPlayer = ({ stream, version, muted = false }) => {
+const VideoPlayer = ({ stream, version, muted = false, socketId }) => {
+    console.log("VideoPlayer Render", socketId);
+
     const videoRef = useRef(null);
 
     useEffect(() => {
+        console.log("VideoPlayer useEffect", socketId);
         const video = videoRef.current;
         if (!video) return;
 
@@ -51,7 +54,7 @@ const VideoPlayer = ({ stream, version, muted = false }) => {
         } else {
             video.srcObject = null;
         }
-    }, [stream, version]);
+    }, [stream, version, socketId]);
 
     return (
         <video
@@ -88,6 +91,10 @@ export default function VideoMeetComponent() {
     let [username, setUsername] = useState("");
     const chatEndRef = useRef();
     let [videos, setVideos] = useState([])
+
+    useEffect(() => {
+        console.log("VIDEOS RENDER", videos);
+    }, [videos]);
 
     // Auto scroll chat to bottom when messages update
     useEffect(() => {
@@ -408,6 +415,7 @@ export default function VideoMeetComponent() {
                 console.log("Participant left:", id);
                 setVideos((videos) => {
                     const updatedVideos = videos.filter((video) => video.socketId !== id);
+                    console.log("VIDEOS STATE UPDATE", updatedVideos);
                     console.table(updatedVideos);
                     return updatedVideos;
                 });
@@ -523,6 +531,7 @@ export default function VideoMeetComponent() {
                                         uniqueVideos.push(video);
                                     }
                                 }
+                                console.log("VIDEOS STATE UPDATE", uniqueVideos);
                                 console.table(uniqueVideos);
                                 return uniqueVideos;
                             });
@@ -694,9 +703,10 @@ export default function VideoMeetComponent() {
                     <div className={styles.meetLayout}>
                         {/* Conference Video tiles */}
                         <div className={styles.conferenceView}>
+                            {(() => { console.log("Rendering videos", videos.length); return null; })()}
                             {videos.map((video) => (
                                 <div key={video.socketId} className={styles.videoCard}>
-                                    <VideoPlayer stream={video.stream} version={video.version} muted={false} />
+                                    <VideoPlayer stream={video.stream} version={video.version} muted={false} socketId={video.socketId} />
                                     <div className={styles.participantName}>
                                         Participant ({video.socketId.substring(0, 5)})
                                     </div>
