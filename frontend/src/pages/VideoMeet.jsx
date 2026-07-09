@@ -38,10 +38,18 @@ function black({ width = 640, height = 480 } = {}) {
     return Object.assign(stream.getVideoTracks()[0], { enabled: false });
 }
 
-const VideoPlayer = React.memo(({ stream, muted = false }) => {
+const VideoPlayer = React.memo(({ stream, muted = false, socketId, isLocal = false }) => {
     const videoRef = useRef(null);
 
     useEffect(() => {
+        console.log("VideoPlayer Component Mounted. Stream ID:", stream?.id, "Socket ID:", socketId, "isLocal:", isLocal);
+        return () => {
+            console.log("VideoPlayer Component Unmounted. Stream ID:", stream?.id, "Socket ID:", socketId, "isLocal:", isLocal);
+        };
+    }, []);
+
+    useEffect(() => {
+        console.log("VideoPlayer Component Updated. Stream ID:", stream?.id, "Socket ID:", socketId, "isLocal:", isLocal);
         const video = videoRef.current;
         if (!video) return;
 
@@ -67,7 +75,26 @@ const VideoPlayer = React.memo(({ stream, muted = false }) => {
             };
             video.onloadeddata = () => console.log("onloadeddata");
             video.oncanplay = () => console.log("oncanplay");
-            video.onplaying = () => console.log("VIDEO PLAYING");
+            
+            video.onplaying = () => {
+                console.log("VIDEO PLAYING");
+                const rect = video.getBoundingClientRect();
+                console.log("getBoundingClientRect():", rect);
+                console.log("offsetWidth:", video.offsetWidth, "offsetHeight:", video.offsetHeight);
+                console.log("clientWidth:", video.clientWidth, "clientHeight:", video.clientHeight);
+                try {
+                    const computed = window.getComputedStyle(video);
+                    console.log("computedStyle.display:", computed.display);
+                    console.log("computedStyle.visibility:", computed.visibility);
+                    console.log("computedStyle.opacity:", computed.opacity);
+                    console.log("computedStyle.zIndex:", computed.zIndex);
+                    console.log("computedStyle.position:", computed.position);
+                    console.log("computedStyle.objectFit:", computed.objectFit);
+                    console.log("computedStyle.transform:", computed.transform);
+                    console.log("computedStyle.pointerEvents:", computed.pointerEvents);
+                } catch (err) {}
+            };
+            
             video.onpause = () => console.log("onpause");
             video.onwaiting = () => console.log("onwaiting");
             video.onstalled = () => console.log("onstalled");
@@ -79,7 +106,7 @@ const VideoPlayer = React.memo(({ stream, muted = false }) => {
         } else {
             video.srcObject = null;
         }
-    }, [stream]);
+    }, [stream, muted, socketId, isLocal]);
 
     return (
         <video
@@ -87,7 +114,26 @@ const VideoPlayer = React.memo(({ stream, muted = false }) => {
             autoPlay
             playsInline
             muted={muted}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            style={isLocal ? {
+                width: '100%',
+                height: '100%',
+                display: 'block',
+                visibility: 'visible',
+                opacity: 1,
+                border: '5px solid lime',
+                objectFit: 'cover'
+            } : {
+                width: '400px',
+                height: '300px',
+                display: 'block',
+                visibility: 'visible',
+                opacity: 1,
+                position: 'relative',
+                zIndex: 99999,
+                background: 'red',
+                border: '5px solid lime',
+                objectFit: 'cover'
+            }}
         />
     );
 });
@@ -646,7 +692,7 @@ export default function VideoMeetComponent() {
                             <Grid size={{ xs: 12, md: 6 }}>
                                 <div style={{ position: 'relative', width: '100%' }}>
                                     <div className={styles.lobbyVideoPreview}>
-                                        <VideoPlayer stream={localStream} muted={true} />
+                                        <VideoPlayer stream={localStream} muted={true} isLocal={true} />
                                     </div>
                                     <Box sx={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 2, zIndex: 10 }}>
                                         <IconButton 
@@ -709,7 +755,7 @@ export default function VideoMeetComponent() {
                         <div className={styles.conferenceView}>
                             {videos.map((video) => (
                                 <div key={video.socketId} className={styles.videoCard}>
-                                    <VideoPlayer stream={video.stream} muted={false} />
+                                    <VideoPlayer stream={video.stream} muted={false} socketId={video.socketId} isLocal={false} />
                                     <div className={styles.participantName}>
                                         Participant ({video.socketId.substring(0, 5)})
                                     </div>
@@ -752,7 +798,7 @@ export default function VideoMeetComponent() {
 
                         {/* Local PIP Video */}
                         <div className={styles.localFloatingCard}>
-                            <VideoPlayer stream={localStream} muted={true} />
+                            <VideoPlayer stream={localStream} muted={true} isLocal={true} />
                             <div className={styles.participantName}>You ({username})</div>
                         </div>
 
