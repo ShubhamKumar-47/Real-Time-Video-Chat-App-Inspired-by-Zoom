@@ -45,6 +45,7 @@ export default function VideoMeetComponent() {
     let socketIdRef = useRef();
     let localVideoref = useRef();
     const connectionsRef = useRef({});
+    const remoteStreamsRef = useRef({});
 
     let [videoAvailable, setVideoAvailable] = useState(true);
     let [audioAvailable, setAudioAvailable] = useState(true);
@@ -421,10 +422,24 @@ export default function VideoMeetComponent() {
                         // Wait for their video track (modern API)
                         connectionsRef.current[socketListId].ontrack = (event) => {
                             console.log("Received remote track from:", socketListId);
-                            const remoteStream = event.streams[0];
-                            if (!remoteStream) return;
+                            console.log("Track kind:", event.track.kind);
+                            console.log("Track readyState:", event.track.readyState);
+                            console.log("Track enabled:", event.track.enabled);
 
-                            console.log("Remote stream:", remoteStream);
+                            if (!remoteStreamsRef.current[socketListId]) {
+                                remoteStreamsRef.current[socketListId] = new MediaStream();
+                            }
+                            const remoteStream = remoteStreamsRef.current[socketListId];
+
+                            // Prevent duplicate track addition to the same stream
+                            if (!remoteStream.getTracks().find(t => t.id === event.track.id)) {
+                                remoteStream.addTrack(event.track);
+                                console.log("Track added to stream for ID:", socketListId);
+                            }
+
+                            console.log("remoteStream tracks:", remoteStream.getTracks());
+                            console.log("remoteStream video tracks:", remoteStream.getVideoTracks());
+                            console.log("remoteStream audio tracks:", remoteStream.getAudioTracks());
 
                             let videoExists = videoRef.current.find(video => video.socketId === socketListId);
 
@@ -458,6 +473,17 @@ export default function VideoMeetComponent() {
                                         videoElement.srcObject = remoteStream;
                                         console.log("Video element:", videoElement);
                                         console.log("Assigned srcObject:", videoElement.srcObject);
+                                        if (videoElement.srcObject.getVideoTracks()[0]) {
+                                            console.log("video.srcObject.getVideoTracks()[0]:", videoElement.srcObject.getVideoTracks()[0]);
+                                        }
+                                        
+                                        videoElement.onloadedmetadata = () => {
+                                            console.log("videoWidth", videoElement.videoWidth);
+                                            console.log("videoHeight", videoElement.videoHeight);
+                                        };
+                                        videoElement.onplaying = () => console.log("VIDEO PLAYING");
+                                        videoElement.onerror = console.error;
+                                        
                                         videoElement.play().catch(console.error);
                                     }
                                 }
@@ -485,15 +511,6 @@ export default function VideoMeetComponent() {
                     for (let id2 in connectionsRef.current) {
                         if (id2 === socketIdRef.current) continue
 
-                        try {
-                            if (window.localStream) {
-                                console.log("Adding local tracks to ID:", id2);
-                                window.localStream.getTracks().forEach(track => {
-                                    connectionsRef.current[id2].addTrack(track, window.localStream);
-                                });
-                            }
-                        } catch (e) { }
-
                         console.log("Creating offer for ID:", id2);
                         connectionsRef.current[id2].createOffer().then((description) => {
                             connectionsRef.current[id2].setLocalDescription(description)
@@ -501,7 +518,7 @@ export default function VideoMeetComponent() {
                                     socketRef.current.emit('signal', id2, JSON.stringify({ 'sdp': connectionsRef.current[id2].localDescription }))
                                 })
                                 .catch(e => console.log(e))
-                        })
+                        }).catch(e => console.log(e))
                     }
                 }
             })
@@ -643,6 +660,17 @@ export default function VideoMeetComponent() {
                                                     console.log("Remote stream:", video.stream);
                                                     console.log("Video element:", ref);
                                                     console.log("Assigned srcObject:", ref.srcObject);
+                                                    if (ref.srcObject.getVideoTracks()[0]) {
+                                                        console.log("video.srcObject.getVideoTracks()[0]:", ref.srcObject.getVideoTracks()[0]);
+                                                    }
+
+                                                    ref.onloadedmetadata = () => {
+                                                        console.log("videoWidth", ref.videoWidth);
+                                                        console.log("videoHeight", ref.videoHeight);
+                                                    };
+                                                    ref.onplaying = () => console.log("VIDEO PLAYING");
+                                                    ref.onerror = console.error;
+
                                                     ref.play().catch(console.error);
                                                 }
                                             }
@@ -650,10 +678,6 @@ export default function VideoMeetComponent() {
                                         autoPlay
                                         playsInline
                                         muted={false}
-                                        onLoadedMetadata={(e) => {
-                                            const videoElement = e.target;
-                                            console.log("Loaded metadata event. videoWidth:", videoElement.videoWidth, "videoHeight:", videoElement.videoHeight);
-                                        }}
                                     ></video>
                                     <div className={styles.participantName}>
                                         Participant ({video.socketId.substring(0, 5)})
