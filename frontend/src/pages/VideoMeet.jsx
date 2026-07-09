@@ -156,17 +156,104 @@ export default function VideoMeetComponent() {
         }
     };
 
+    const runStatsAudit = async (socketListId) => {
+        try {
+            const pc = peerConnections.current.get(socketListId);
+            if (!pc) return;
+            
+            const stats = await pc.getStats();
+            console.log(`--- WEBRTC ICE STATS AUDIT FOR ${socketListId} ---`);
+            console.log("ICE Connection State:", pc.iceConnectionState);
+            console.log("Connection State:", pc.connectionState);
+            console.log("Signaling State:", pc.signalingState);
+            
+            let selectedPairReport = null;
+            const candidateReports = new Map();
+
+            stats.forEach(report => {
+                if (report.type === 'candidate-pair' && report.selected) {
+                    selectedPairReport = report;
+                }
+                if (report.type === 'local-candidate' || report.type === 'remote-candidate') {
+                    candidateReports.set(report.id, report);
+                }
+            });
+
+            if (selectedPairReport) {
+                const localCand = candidateReports.get(selectedPairReport.localCandidateId);
+                const remoteCand = candidateReports.get(selectedPairReport.remoteCandidateId);
+
+                console.log("[Selected Candidate Pair Stats]:", {
+                    state: selectedPairReport.state,
+                    localCandidateType: localCand?.candidateType,
+                    localIp: localCand?.ip || localCand?.address,
+                    localPort: localCand?.port,
+                    remoteCandidateType: remoteCand?.candidateType,
+                    remoteIp: remoteCand?.ip || remoteCand?.address,
+                    remotePort: remoteCand?.port,
+                    relayProtocol: selectedPairReport.relayProtocol || "None",
+                    requestsSent: selectedPairReport.requestsSent,
+                    responsesReceived: selectedPairReport.responsesReceived
+                });
+            } else {
+                console.log("No selected candidate pair found yet. Checking general candidate pair statuses...");
+                stats.forEach(report => {
+                    if (report.type === 'candidate-pair') {
+                        console.log(`Candidate Pair ${report.id} state: ${report.state}, localId: ${report.localCandidateId}, remoteId: ${report.remoteCandidateId}`);
+                    }
+                });
+            }
+            console.log(`-----------------------------------------------`);
+        } catch (err) {
+            console.error("Stats audit error:", err);
+        }
+    };
+
     const getOrCreatePeerConnection = (socketListId) => {
         if (peerConnections.current.has(socketListId)) {
             return peerConnections.current.get(socketListId);
         }
 
+        console.log("RTCPeerConnection ICE configuration:", peerConfigConnections);
         const pc = new RTCPeerConnection(peerConfigConnections);
         peerConnections.current.set(socketListId, pc);
 
+        pc.onconnectionstatechange = () => {
+            console.log(`[Connection State Change] ${socketListId}:`, pc.connectionState);
+            if (pc.connectionState === "connected" || pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+                runStatsAudit(socketListId);
+            }
+        };
+
+        pc.oniceconnectionstatechange = () => {
+            console.log(`[ICE Connection State Change] ${socketListId}:`, pc.iceConnectionState);
+        };
+
+        pc.onicegatheringstatechange = () => {
+            console.log(`[ICE Gathering State Change] ${socketListId}:`, pc.iceGatheringState);
+        };
+
         pc.onicecandidate = (event) => {
             if (event.candidate) {
+                console.log(`[ICE Candidate Generated] Sending candidate to ${socketListId}:`, {
+                    candidate: event.candidate.candidate,
+                    sdpMid: event.candidate.sdpMid,
+                    sdpMLineIndex: event.candidate.sdpMLineIndex
+                });
+                
+                // Parse candidate components
+                const parts = event.candidate.candidate.split(' ');
+                if (parts.length >= 8) {
+                    const type = parts[7];
+                    const protocol = parts[2];
+                    const address = parts[4];
+                    const port = parts[5];
+                    console.log(`Parsed local candidate components: type=${type}, protocol=${protocol}, address=${address}, port=${port}`);
+                }
+
                 socketRef.current.emit('signal', socketListId, JSON.stringify({ 'ice': event.candidate }));
+            } else {
+                console.log(`[ICE Candidate Generation Complete] for ${socketListId}`);
             }
         };
 
@@ -235,7 +322,25 @@ export default function VideoMeetComponent() {
                     socketRef.current.emit('signal', fromId, JSON.stringify({ 'sdp': pc.localDescription }));
                 }
             } else if (signal.ice) {
-                await pc.addIceCandidate(new RTCIceCandidate(signal.ice));
+                console.log(`[ICE Candidate Received] from ${fromId}:`, signal.ice);
+                
+                // Parse candidate components
+                const parts = signal.ice.candidate.split(' ');
+                if (parts.length >= 8) {
+                    const type = parts[7];
+                    const protocol = parts[2];
+                    const address = parts[4];
+                    const port = parts[5];
+                    console.log(`Parsed remote candidate components: type=${type}, protocol=${protocol}, address=${address}, port=${port}`);
+                }
+
+                pc.addIceCandidate(new RTCIceCandidate(signal.ice))
+                    .then(() => {
+                        console.log(`[ICE Candidate Added Successfully] for ${fromId}`);
+                    })
+                    .catch((err) => {
+                        console.error(`[ICE Candidate Addition Failed] for ${fromId}:`, err);
+                    });
             }
         } catch (err) {
             console.error(`Error processing signaling message from ${fromId}:`, err);
