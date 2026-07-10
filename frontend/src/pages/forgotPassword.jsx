@@ -8,6 +8,8 @@ import { motion } from 'framer-motion'
 export default function ForgotPassword() {
   const [email, setEmail] = useState('')
   const [snackOpen, setSnackOpen] = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const emailRef = useRef(null)
   const navigate = useNavigate()
 
@@ -16,7 +18,18 @@ export default function ForgotPassword() {
   }, [])
 
   const handleSubmit = async () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address.')
+      return
+    }
+    setError('')
+    setLoading(true)
     setSnackOpen(true)
+    setTimeout(() => {
+      setLoading(false)
+      navigate('/auth')
+    }, 2500)
   }
 
   return (
@@ -36,7 +49,7 @@ export default function ForgotPassword() {
                 <IconButton onClick={() => navigate('/auth')} sx={{ border: '1px solid rgba(15,23,42,0.08)', bgcolor: '#F8FAFC' }}>
                    <ArrowBackIcon sx={{ fontSize: 18 }} />
                 </IconButton>
-                <Typography sx={{ fontWeight: 800, fontSize: 20 }}>ForgotPassword</Typography>
+                <Typography sx={{ fontWeight: 800, fontSize: 20 }}>Forgot Password</Typography>
               </Box>
 
               <Box>
@@ -51,8 +64,12 @@ export default function ForgotPassword() {
                   label="Email Address" 
                   placeholder="you@company.com"
                   value={email} 
-                  onChange={(e) => setEmail(e.target.value)} 
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setError('')
+                  }} 
                   inputRef={emailRef}
+                  error={!!error}
                   InputProps={{
                     startAdornment: (
                       <EmailOutlinedIcon sx={{ color: 'rgba(15,23,42,0.38)', mr: 1.5, fontSize: 20 }} />
@@ -64,12 +81,18 @@ export default function ForgotPassword() {
                     }
                   }}
                 />
+
+                {error && (
+                  <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: 'rgba(248,113,113,0.1)', color: '#B91C1C' }}>
+                    <Typography sx={{ fontSize: 13.5 }}>{error}</Typography>
+                  </Box>
+                )}
                 
                 <Button 
                   variant="contained" 
                   fullWidth 
                   onClick={handleSubmit}
-                  disabled={!email}
+                  disabled={!email || loading}
                   sx={{ 
                     py: 1.6, 
                     minHeight: 48,
@@ -82,11 +105,11 @@ export default function ForgotPassword() {
                     }
                   }}
                 >
-                  Send Reset Link
+                  {loading ? 'Sending...' : 'Send Reset Link'}
                 </Button>
               </Stack>
 
-              <Box sx={{ textAlignment: 'center', display: 'flex', justifyContent: 'center' }}>
+              <Box sx={{ textAlign: 'center', display: 'flex', justifyContent: 'center' }}>
                 <Link component="button" variant="body2" onClick={() => navigate('/auth')} sx={{ color: '#6D4AFF', fontWeight: 700, textDecoration: 'none' }}>
                   Back to Sign In
                 </Link>
