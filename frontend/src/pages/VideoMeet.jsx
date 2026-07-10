@@ -48,6 +48,8 @@ export default function VideoMeetComponent() {
     const peerConnections = useRef(new Map());
     const remoteStreams = useRef(new Map());
     const makingOfferRef = useRef(new Map());
+    const ignoreOfferRef = useRef(new Map());
+    const pendingCandidatesRef = useRef(new Map());
 
     const [localStream, setLocalStream] = useState(null);
     const [participants, setParticipants] = useState([]);
@@ -149,8 +151,11 @@ export default function VideoMeetComponent() {
         peerConnections.current.clear();
         remoteStreams.current.clear();
         makingOfferRef.current.clear();
+        ignoreOfferRef.current.clear();
+        pendingCandidatesRef.current.clear();
 
         if (socketRef.current) {
+            socketRef.current.off();
             socketRef.current.disconnect();
             socketRef.current = null;
         }
@@ -235,6 +240,7 @@ export default function VideoMeetComponent() {
 
         pc.onicecandidate = (event) => {
             if (event.candidate) {
+                console.log(`[${new Date().toISOString()}] ICE Sent to socketId: ${socketListId}`);
                 console.log(`[ICE Candidate Generated] Sending candidate to ${socketListId}:`, {
                     candidate: event.candidate.candidate,
                     sdpMid: event.candidate.sdpMid,
@@ -286,6 +292,7 @@ export default function VideoMeetComponent() {
 
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
+                console.log(`[${new Date().toISOString()}] Offer Sent to socketId: ${socketListId}`);
                 socketRef.current.emit('signal', socketListId, JSON.stringify({ 'sdp': pc.localDescription }));
             } catch (err) {
                 console.error(`Negotiation error for ${socketListId}:`, err);
@@ -306,41 +313,90 @@ export default function VideoMeetComponent() {
         try {
             if (signal.sdp) {
                 const desc = new RTCSessionDescription(signal.sdp);
+                
+                if (desc.type === 'offer') {
+                    console.log(`[${new Date().toISOString()}] Offer Received from socketId: ${fromId}`);
+                } else if (desc.type === 'answer') {
+                    console.log(`[${new Date().toISOString()}] Answer Received from socketId: ${fromId}`);
+                }
+
+                // Never process the same SDP twice
+                if (pc.remoteDescription && pc.remoteDescription.sdp === desc.sdp) {
+                    console.log(`[${new Date().toISOString()}] Duplicate SDP Ignored. Already set as remoteDescription. Socket ID: ${fromId}`);
+                    return;
+                }
+
+                // If it is an answer, ignore it if we are not in the "have-local-offer" state
+                if (desc.type === 'answer') {
+                    if (pc.signalingState !== 'have-local-offer') {
+                        console.log(`[${new Date().toISOString()}] Answer Ignored from socketId: ${fromId} (state is ${pc.signalingState}, expected have-local-offer)`);
+                        return;
+                    }
+                }
+
                 const offerCollision = desc.type === 'offer' && 
                     (makingOfferRef.current.get(fromId) || pc.signalingState !== 'stable');
                 
+                const polite = socketIdRef.current > fromId;
+                const ignoreOffer = !polite && offerCollision;
+                ignoreOfferRef.current.set(fromId, ignoreOffer);
+
+                if (ignoreOffer) {
+                    console.log(`[${new Date().toISOString()}] Offer Collision: Impolite peer ignoring offer from socketId: ${fromId}`);
+                    return;
+                }
+
                 if (offerCollision) {
+                    console.log(`[${new Date().toISOString()}] Offer Collision: Polite peer rolling back and accepting offer from socketId: ${fromId}`);
                     await pc.setLocalDescription({ type: 'rollback' });
                     await pc.setRemoteDescription(desc);
                 } else {
                     await pc.setRemoteDescription(desc);
                 }
 
+                // Flush pending candidates now that remoteDescription exists
+                const pending = pendingCandidatesRef.current.get(fromId) || [];
+                for (const candidate of pending) {
+                    try {
+                        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                        console.log(`[${new Date().toISOString()}] Buffered ICE Candidate Added successfully for socketId: ${fromId}`);
+                    } catch (err) {
+                        if (!ignoreOfferRef.current.get(fromId)) {
+                            console.error(`[${new Date().toISOString()}] Buffered ICE Candidate Addition Failed for socketId: ${fromId}:`, err);
+                        }
+                    }
+                }
+                pending.length = 0;
+
                 if (desc.type === 'offer') {
                     const answer = await pc.createAnswer();
                     await pc.setLocalDescription(answer);
+                    console.log(`[${new Date().toISOString()}] Answer Sent to socketId: ${fromId}`);
                     socketRef.current.emit('signal', fromId, JSON.stringify({ 'sdp': pc.localDescription }));
                 }
             } else if (signal.ice) {
-                console.log(`[ICE Candidate Received] from ${fromId}:`, signal.ice);
+                console.log(`[${new Date().toISOString()}] ICE Received from socketId: ${fromId}`);
                 
-                // Parse candidate components
-                const parts = signal.ice.candidate.split(' ');
-                if (parts.length >= 8) {
-                    const type = parts[7];
-                    const protocol = parts[2];
-                    const address = parts[4];
-                    const port = parts[5];
-                    console.log(`Parsed remote candidate components: type=${type}, protocol=${protocol}, address=${address}, port=${port}`);
+                const pending = pendingCandidatesRef.current.get(fromId) || [];
+                if (!pendingCandidatesRef.current.has(fromId)) {
+                    pendingCandidatesRef.current.set(fromId, pending);
                 }
 
-                pc.addIceCandidate(new RTCIceCandidate(signal.ice))
-                    .then(() => {
-                        console.log(`[ICE Candidate Added Successfully] for ${fromId}`);
-                    })
-                    .catch((err) => {
-                        console.error(`[ICE Candidate Addition Failed] for ${fromId}:`, err);
-                    });
+                if (!pc.remoteDescription) {
+                    console.log(`[${new Date().toISOString()}] remoteDescription is null for socketId: ${fromId}. Buffering ICE candidate.`);
+                    pending.push(signal.ice);
+                } else {
+                    try {
+                        await pc.addIceCandidate(new RTCIceCandidate(signal.ice));
+                        console.log(`[${new Date().toISOString()}] ICE Candidate Added Successfully for socketId: ${fromId}`);
+                    } catch (err) {
+                        if (!ignoreOfferRef.current.get(fromId)) {
+                            console.error(`[${new Date().toISOString()}] ICE Candidate Addition Failed for socketId: ${fromId}:`, err);
+                        } else {
+                            console.log(`[${new Date().toISOString()}] ICE Candidate Ignored for socketId: ${fromId} due to ignored offer`);
+                        }
+                    }
+                }
             }
         } catch (err) {
             console.error(`Error processing signaling message from ${fromId}:`, err);
@@ -348,6 +404,10 @@ export default function VideoMeetComponent() {
     };
 
     const connectToSocketServer = () => {
+        if (socketRef.current) {
+            socketRef.current.off();
+            socketRef.current.disconnect();
+        }
         socketRef.current = io.connect(server_url, { secure: false });
 
         socketRef.current.on('signal', gotMessageFromServer);
