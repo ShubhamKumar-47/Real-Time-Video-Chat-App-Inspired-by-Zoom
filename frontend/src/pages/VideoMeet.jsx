@@ -741,7 +741,7 @@ export default function VideoMeetComponent() {
                             {console.log("Participants Render")}
                             {participants.filter(p => !p.isLocal).map((participant) => (
                                 <div key={participant.socketId} className={styles.videoCard}>
-                                    <VideoPlayer stream={remoteStreams.current.get(participant.socketId)} muted={false} />
+                                    <VideoPlayer key={participant.socketId} stream={remoteStreams.current.get(participant.socketId)} muted={false} />
                                     <div className={styles.participantName}>
                                         Participant ({participant.socketId.substring(0, 5)})
                                     </div>

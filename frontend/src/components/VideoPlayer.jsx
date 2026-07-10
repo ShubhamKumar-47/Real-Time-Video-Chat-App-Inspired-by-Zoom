@@ -4,6 +4,12 @@ const VideoPlayer = React.memo(({ stream, muted = false }) => {
     console.log("VideoPlayer Render");
     const videoRef = useRef();
 
+    const prevStreamRef = useRef();
+    console.log("previousStream === currentStream", prevStreamRef.current === stream);
+    useEffect(() => {
+        prevStreamRef.current = stream;
+    });
+
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
@@ -29,17 +35,31 @@ const VideoPlayer = React.memo(({ stream, muted = false }) => {
             console.error("video.onerror fired", e);
         };
 
+        const handleTrackAdded = (e) => {
+            console.log(`[VideoPlayer] Track added to stream: ${e.track.kind}`);
+            video.play().catch(console.error);
+        };
+
         if (stream) {
+            stream.addEventListener('addtrack', handleTrackAdded);
+            stream.addEventListener('removetrack', handleTrackAdded);
+
             if (video.srcObject !== stream) {
                 video.srcObject = stream;
                 console.log("srcObject === stream", video.srcObject === stream);
                 console.log("videoWidth", video.videoWidth);
                 console.log("videoHeight", video.videoHeight);
                 video.play().catch(console.error);
+            } else {
+                video.play().catch(console.error);
             }
         }
 
         return () => {
+            if (stream) {
+                stream.removeEventListener('addtrack', handleTrackAdded);
+                stream.removeEventListener('removetrack', handleTrackAdded);
+            }
             video.onloadedmetadata = null;
             video.onloadeddata = null;
             video.oncanplay = null;
