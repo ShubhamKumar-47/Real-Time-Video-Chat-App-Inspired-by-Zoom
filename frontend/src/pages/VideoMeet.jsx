@@ -49,7 +49,6 @@ export default function VideoMeetComponent() {
     const peerConnections = useRef(new Map());
     const remoteStreams = useRef(new Map());
     const makingOfferRef = useRef(new Map());
-    const ignoreOfferRef = useRef(new Map());
     const pendingCandidatesRef = useRef(new Map());
 
     const [localStreamCounter, setLocalStreamCounter] = useState(0);
@@ -155,7 +154,6 @@ export default function VideoMeetComponent() {
         peerConnections.current.clear();
         remoteStreams.current.clear();
         makingOfferRef.current.clear();
-        ignoreOfferRef.current.clear();
         pendingCandidatesRef.current.clear();
 
         if (socketRef.current) {
@@ -303,6 +301,10 @@ export default function VideoMeetComponent() {
         };
 
         pc.onnegotiationneeded = async () => {
+            if (!pc.isOfferer) {
+                console.log(`[onnegotiationneeded] Ignoring offer creation for ${socketListId} because we are the answerer.`);
+                return;
+            }
             try {
                 if (makingOfferRef.current.get(socketListId) || pc.signalingState !== 'stable') {
                     return;
@@ -353,25 +355,7 @@ export default function VideoMeetComponent() {
                     }
                 }
 
-                const offerCollision = desc.type === 'offer' && 
-                    (makingOfferRef.current.get(fromId) || pc.signalingState !== 'stable');
-                
-                const polite = socketIdRef.current > fromId;
-                const ignoreOffer = !polite && offerCollision;
-                ignoreOfferRef.current.set(fromId, ignoreOffer);
-
-                if (ignoreOffer) {
-                    console.log(`[${new Date().toISOString()}] Offer Collision: Impolite peer ignoring offer from socketId: ${fromId}`);
-                    return;
-                }
-
-                if (offerCollision) {
-                    console.log(`[${new Date().toISOString()}] Offer Collision: Polite peer rolling back and accepting offer from socketId: ${fromId}`);
-                    await pc.setLocalDescription({ type: 'rollback' });
-                    await pc.setRemoteDescription(desc);
-                } else {
-                    await pc.setRemoteDescription(desc);
-                }
+                await pc.setRemoteDescription(desc);
 
                 // Flush pending candidates now that remoteDescription exists
                 const pending = pendingCandidatesRef.current.get(fromId) || [];
@@ -380,9 +364,7 @@ export default function VideoMeetComponent() {
                         await pc.addIceCandidate(new RTCIceCandidate(candidate));
                         console.log(`[${new Date().toISOString()}] Buffered ICE Candidate Added successfully for socketId: ${fromId}`);
                     } catch (err) {
-                        if (!ignoreOfferRef.current.get(fromId)) {
-                            console.error(`[${new Date().toISOString()}] Buffered ICE Candidate Addition Failed for socketId: ${fromId}:`, err);
-                        }
+                        console.error(`[${new Date().toISOString()}] Buffered ICE Candidate Addition Failed for socketId: ${fromId}:`, err);
                     }
                 }
                 pending.length = 0;
@@ -409,11 +391,7 @@ export default function VideoMeetComponent() {
                         await pc.addIceCandidate(new RTCIceCandidate(signal.ice));
                         console.log(`[${new Date().toISOString()}] ICE Candidate Added Successfully for socketId: ${fromId}`);
                     } catch (err) {
-                        if (!ignoreOfferRef.current.get(fromId)) {
-                            console.error(`[${new Date().toISOString()}] ICE Candidate Addition Failed for socketId: ${fromId}:`, err);
-                        } else {
-                            console.log(`[${new Date().toISOString()}] ICE Candidate Ignored for socketId: ${fromId} due to ignored offer`);
-                        }
+                        console.error(`[${new Date().toISOString()}] ICE Candidate Addition Failed for socketId: ${fromId}:`, err);
                     }
                 }
             }
@@ -462,6 +440,12 @@ export default function VideoMeetComponent() {
                                 pc.addTrack(track, window.localStream);
                             }
                         });
+                    }
+
+                    if (id !== socketIdRef.current && socketListId === id) {
+                        pc.isOfferer = true;
+                    } else {
+                        pc.isOfferer = false;
                     }
                 });
             });
