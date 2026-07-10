@@ -62,6 +62,15 @@ export default function Authentication() {
   const isMd = useMediaQuery(theme.breakpoints.up('md'))
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const emailParam = params.get('email')
+    if (emailParam) {
+      setUsername(emailParam)
+      setFormState(1)
+    }
+  }, [])
+
+  useEffect(() => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     const usernameRegex = /^[a-zA-Z0-9_]{3,30}$/
     setEmailValid(emailRegex.test(username) || usernameRegex.test(username) || username === '')

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Box,
@@ -92,6 +92,8 @@ export default function LandingPage() {
   const navigate = useNavigate()
   const theme = useTheme()
   const isMd = useMediaQuery(theme.breakpoints.up('md'))
+  const [email, setEmail] = useState('')
+  const [emailError, setEmailError] = useState(false)
 
   return (    <Box sx={{ minHeight: '100%', background: 'radial-gradient(circle at top left, rgba(99,102,241,0.18), transparent 24%), radial-gradient(circle at bottom right, rgba(59,130,246,0.14), transparent 28%), #FAFBFD', color: 'text.primary' }}>
       <Box component={motion.section} initial="hidden" animate="visible" variants={floatVariant} sx={{ pt: { xs: 5, sm: 7, lg: 9 }, pb: { xs: 5, sm: 7, lg: 9 } }}>
@@ -418,20 +420,49 @@ export default function LandingPage() {
                   fullWidth
                   placeholder="Enter your email address"
                   variant="outlined"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setEmailError(false)
+                  }}
+                  error={emailError}
+                  helperText={emailError ? 'Please enter a valid email address' : ''}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+                      if (!emailRegex.test(email)) {
+                        setEmailError(true)
+                        return
+                      }
+                      navigate(`/auth?email=${encodeURIComponent(email)}`)
+                    }
+                  }}
                   sx={{
                     bgcolor: 'rgba(255,255,255,0.06)',
-                    input: { color: '#fff', py: 0 },
+                    input: { color: '#fff' },
                     '& .MuiOutlinedInput-root': {
                       height: 48,
                       borderRadius: '10px',
                       '& fieldset': { borderColor: 'rgba(255,255,255,0.12)' },
                       '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
                       '&.Mui-focused fieldset': { borderColor: '#6D4AFF' }
+                    },
+                    '& .MuiFormHelperText-root': {
+                      color: '#EF4444',
+                      position: 'absolute',
+                      bottom: -22
                     }
                   }}
                 />
                 <Button
-                  onClick={() => alert("Subscription request submitted (mock)")}
+                  onClick={() => {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+                    if (!emailRegex.test(email)) {
+                      setEmailError(true)
+                      return
+                    }
+                    navigate(`/auth?email=${encodeURIComponent(email)}`)
+                  }}
                   variant="contained"
                   sx={{
                     width: { xs: '100%', sm: 'auto' },
