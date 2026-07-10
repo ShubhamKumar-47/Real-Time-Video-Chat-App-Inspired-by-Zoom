@@ -1,4 +1,4 @@
-# 🎥 Real-Time Video Chat App (Zoom Inspired)
+# 🎥 Real-Time Video Chat App (EasyMeet Space)
 
 A full-stack real-time video conferencing application inspired by Zoom. Built using WebRTC and Socket.IO to enable seamless audio and video communication directly inside the browser.
 
