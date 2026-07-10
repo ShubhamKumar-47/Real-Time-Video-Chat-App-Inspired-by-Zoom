@@ -120,6 +120,30 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const requestPasswordResetOtp = async (email) => {
+        try {
+            let request = await client.post("/forgot-password", {
+                username: email
+            });
+            return request.data;
+        } catch (err) {
+            throw err;
+        }
+    };
+
+    const resetPasswordWithOtp = async (email, otp, newPassword) => {
+        try {
+            let request = await client.post("/reset-password", {
+                username: email,
+                otp,
+                newPassword
+            });
+            return request.data;
+        } catch (err) {
+            throw err;
+        }
+    };
+
     const handleLogout = () => {
         localStorage.removeItem("token");
         sessionStorage.removeItem("token");
@@ -135,7 +159,9 @@ export const AuthProvider = ({ children }) => {
         handleRegister,
         handleLogin,
         fetchUserInfo,
-        handleLogout
+        handleLogout,
+        requestPasswordResetOtp,
+        resetPasswordWithOtp
     };
 
     return (
