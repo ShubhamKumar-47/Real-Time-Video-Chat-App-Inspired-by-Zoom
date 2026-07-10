@@ -1,16 +1,15 @@
 import React, { useEffect, useRef } from 'react';
 
-const VideoPlayer = ({ stream, muted = false }) => {
-    const videoRef = useRef(null);
+const VideoPlayer = React.memo(({ stream, muted = false }) => {
+    console.log("VideoPlayer Render");
+    const videoRef = useRef();
 
     useEffect(() => {
-        const video = videoRef.current;
-        if (!video) return;
-
-        if (stream) {
-            video.srcObject = stream;
-        } else {
-            video.srcObject = null;
+        if (videoRef.current && stream) {
+            if (videoRef.current.srcObject !== stream) {
+                videoRef.current.srcObject = stream;
+                videoRef.current.play().catch(console.error);
+            }
         }
     }, [stream]);
 
@@ -23,6 +22,6 @@ const VideoPlayer = ({ stream, muted = false }) => {
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
     );
-};
+});
 
 export default VideoPlayer;

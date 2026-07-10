@@ -40,6 +40,7 @@ function black({ width = 640, height = 480 } = {}) {
 }
 
 export default function VideoMeetComponent() {
+    console.log("VideoMeet Render");
     const { userData } = useContext(AuthContext);
 
     const socketRef = useRef(null);
@@ -51,7 +52,7 @@ export default function VideoMeetComponent() {
     const ignoreOfferRef = useRef(new Map());
     const pendingCandidatesRef = useRef(new Map());
 
-    const [localStream, setLocalStream] = useState(null);
+    const [localStreamCounter, setLocalStreamCounter] = useState(0);
     const [participants, setParticipants] = useState([]);
 
     const [videoAvailable, setVideoAvailable] = useState(true);
@@ -94,7 +95,8 @@ export default function VideoMeetComponent() {
                 setVideoAvailable(true);
                 setAudioAvailable(true);
                 window.localStream = userMediaStream;
-                setLocalStream(userMediaStream);
+                remoteStreams.current.set('local', userMediaStream);
+                setLocalStreamCounter(c => c + 1);
             }
         } catch (error) {
             console.log("Could not obtain both audio and video, trying fallback:", error);
@@ -103,14 +105,16 @@ export default function VideoMeetComponent() {
                 setVideoAvailable(true);
                 setAudioAvailable(false);
                 window.localStream = videoStream;
-                setLocalStream(videoStream);
+                remoteStreams.current.set('local', videoStream);
+                setLocalStreamCounter(c => c + 1);
             } catch (err2) {
                 try {
                     const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                     setVideoAvailable(false);
                     setAudioAvailable(true);
                     window.localStream = audioStream;
-                    setLocalStream(audioStream);
+                    remoteStreams.current.set('local', audioStream);
+                    setLocalStreamCounter(c => c + 1);
                 } catch (err3) {
                     console.log("No audio/video devices accessible:", err3);
                     setVideoAvailable(false);
@@ -264,21 +268,29 @@ export default function VideoMeetComponent() {
         };
 
         pc.ontrack = (event) => {
-            if (!remoteStreams.current.has(socketListId)) {
-                remoteStreams.current.set(socketListId, new MediaStream());
-            }
-            const remoteStream = remoteStreams.current.get(socketListId);
-
-            if (!remoteStream.getTracks().find(t => t.id === event.track.id)) {
-                remoteStream.addTrack(event.track);
+            console.log(`[${new Date().toISOString()}] ontrack event for ${socketListId}`);
+            
+            let remoteStream = event.streams && event.streams[0];
+            if (remoteStream) {
+                remoteStreams.current.set(socketListId, remoteStream);
+            } else {
+                if (!remoteStreams.current.has(socketListId)) {
+                    remoteStreams.current.set(socketListId, new MediaStream());
+                }
+                remoteStream = remoteStreams.current.get(socketListId);
+                if (event.track) {
+                    if (!remoteStream.getTracks().find(t => t.id === event.track.id)) {
+                        remoteStream.addTrack(event.track);
+                    }
+                }
             }
 
             setParticipants(prev => {
                 const exists = prev.find(p => p.socketId === socketListId);
                 if (exists) {
-                    return prev.map(p => p.socketId === socketListId ? { ...p, stream: remoteStream } : p);
+                    return prev;
                 } else {
-                    return [...prev, { socketId: socketListId, stream: remoteStream, isLocal: false, username: socketListId }];
+                    return [...prev, { socketId: socketListId, isLocal: false, username: socketListId }];
                 }
             });
         };
@@ -451,14 +463,15 @@ export default function VideoMeetComponent() {
 
     const getUserMediaSuccess = (stream) => {
         window.localStream = stream;
-        setLocalStream(stream);
+        remoteStreams.current.set('local', stream);
+        setLocalStreamCounter(c => c + 1);
 
         setParticipants(prev => {
             const exists = prev.find(p => p.isLocal);
             if (exists) {
-                return prev.map(p => p.isLocal ? { ...p, stream: stream } : p);
+                return prev;
             } else {
-                return [...prev, { socketId: 'local', stream: stream, isLocal: true, username: username || 'You' }];
+                return [...prev, { socketId: 'local', isLocal: true, username: username || 'You' }];
             }
         });
 
@@ -498,9 +511,8 @@ export default function VideoMeetComponent() {
 
                 const fallbackStream = new MediaStream([black(), silence()]);
                 window.localStream = fallbackStream;
-                setLocalStream(fallbackStream);
-
-                setParticipants(prev => prev.map(p => p.isLocal ? { ...p, stream: fallbackStream } : p));
+                remoteStreams.current.set('local', fallbackStream);
+                setLocalStreamCounter(c => c + 1);
 
                 const fallbackVideo = fallbackStream.getVideoTracks()[0];
                 const fallbackAudio = fallbackStream.getAudioTracks()[0];
@@ -546,8 +558,8 @@ export default function VideoMeetComponent() {
 
     const getDislayMediaSuccess = (stream) => {
         window.localStream = stream;
-        setLocalStream(stream);
-        setParticipants(prev => prev.map(p => p.isLocal ? { ...p, stream: stream } : p));
+        remoteStreams.current.set('local', stream);
+        setLocalStreamCounter(c => c + 1);
 
         const videoTrack = stream.getVideoTracks()[0];
 
@@ -633,7 +645,10 @@ export default function VideoMeetComponent() {
 
     const connect = () => {
         setAskForUsername(false);
-        setParticipants([{ socketId: 'local', stream: window.localStream || localStream, isLocal: true, username: username || 'You' }]);
+        if (window.localStream) {
+            remoteStreams.current.set('local', window.localStream);
+        }
+        setParticipants([{ socketId: 'local', isLocal: true, username: username || 'You' }]);
         
         setVideo(videoAvailable);
         setAudio(audioAvailable);
@@ -655,7 +670,7 @@ export default function VideoMeetComponent() {
                             <Grid size={{ xs: 12, md: 6 }}>
                                 <div style={{ position: 'relative', width: '100%' }}>
                                     <div className={styles.lobbyVideoPreview}>
-                                        <VideoPlayer stream={localStream} muted={true} />
+                                        <VideoPlayer stream={remoteStreams.current.get('local')} muted={true} />
                                     </div>
                                     <Box sx={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 2, zIndex: 10 }}>
                                         <IconButton 
@@ -716,9 +731,10 @@ export default function VideoMeetComponent() {
                     <div className={styles.meetLayout}>
                         {/* Conference Video tiles */}
                         <div className={styles.conferenceView}>
+                            {console.log("Participants Render")}
                             {participants.filter(p => !p.isLocal).map((participant) => (
                                 <div key={participant.socketId} className={styles.videoCard}>
-                                    <VideoPlayer stream={participant.stream} muted={false} />
+                                    <VideoPlayer stream={remoteStreams.current.get(participant.socketId)} muted={false} />
                                     <div className={styles.participantName}>
                                         Participant ({participant.socketId.substring(0, 5)})
                                     </div>
@@ -761,7 +777,7 @@ export default function VideoMeetComponent() {
 
                         {/* Local PIP Video */}
                         <div className={styles.localFloatingCard}>
-                            <VideoPlayer stream={localStream} muted={true} />
+                            <VideoPlayer stream={remoteStreams.current.get('local')} muted={true} />
                             <div className={styles.participantName}>You ({username})</div>
                         </div>
 
