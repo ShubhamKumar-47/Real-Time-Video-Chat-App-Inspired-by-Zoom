@@ -269,6 +269,13 @@ export default function VideoMeetComponent() {
 
         pc.ontrack = (event) => {
             console.log(`[${new Date().toISOString()}] ontrack event for ${socketListId}`);
+            console.log("event.track.kind", event.track.kind);
+            console.log("event.streams.length", event.streams ? event.streams.length : 0);
+            console.log("event.streams", event.streams);
+            console.log("event.streams[0]", event.streams ? event.streams[0] : null);
+            console.log("event.track.id", event.track.id);
+            console.log("event.track.muted", event.track.muted);
+            console.log("event.track.readyState", event.track.readyState);
             
             let remoteStream = event.streams && event.streams[0];
             if (remoteStream) {

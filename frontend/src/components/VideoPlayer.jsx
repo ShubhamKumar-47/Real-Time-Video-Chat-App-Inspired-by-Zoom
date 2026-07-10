@@ -5,12 +5,47 @@ const VideoPlayer = React.memo(({ stream, muted = false }) => {
     const videoRef = useRef();
 
     useEffect(() => {
-        if (videoRef.current && stream) {
-            if (videoRef.current.srcObject !== stream) {
-                videoRef.current.srcObject = stream;
-                videoRef.current.play().catch(console.error);
+        const video = videoRef.current;
+        if (!video) return;
+
+        console.log("Video element", video);
+        console.log("Current srcObject", video.srcObject);
+
+        video.onloadedmetadata = (e) => {
+            console.log("video.onloadedmetadata fired", e);
+            console.log("videoWidth onloadedmetadata", video.videoWidth);
+            console.log("videoHeight onloadedmetadata", video.videoHeight);
+        };
+        video.onloadeddata = (e) => {
+            console.log("video.onloadeddata fired", e);
+        };
+        video.oncanplay = (e) => {
+            console.log("video.oncanplay fired", e);
+        };
+        video.onplaying = (e) => {
+            console.log("video.onplaying fired", e);
+        };
+        video.onerror = (e) => {
+            console.error("video.onerror fired", e);
+        };
+
+        if (stream) {
+            if (video.srcObject !== stream) {
+                video.srcObject = stream;
+                console.log("srcObject === stream", video.srcObject === stream);
+                console.log("videoWidth", video.videoWidth);
+                console.log("videoHeight", video.videoHeight);
+                video.play().catch(console.error);
             }
         }
+
+        return () => {
+            video.onloadedmetadata = null;
+            video.onloadeddata = null;
+            video.oncanplay = null;
+            video.onplaying = null;
+            video.onerror = null;
+        };
     }, [stream]);
 
     return (
